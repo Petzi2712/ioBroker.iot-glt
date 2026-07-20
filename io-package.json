@@ -1,0 +1,61 @@
+{
+  "common": {
+    "name": "iot-glt",
+    "version": "0.1.0",
+    "titleLang": { "en": "IOT GLT", "de": "IOT GLT" },
+    "desc": {
+      "en": "Building management visualization, trends and energy reports",
+      "de": "Gebäudeleittechnik mit Anlagenbildern, Trends und Energieberichten"
+    },
+    "authors": ["Petzi2712"],
+    "license": "MIT",
+    "platform": "Javascript/Node.js",
+    "mode": "daemon",
+    "type": "energy",
+    "compact": true,
+    "connectionType": "local",
+    "dataSource": "poll",
+    "icon": "iot-glt.svg",
+    "adminUI": { "config": "json" },
+    "enabled": true,
+    "extIcon": "https://raw.githubusercontent.com/Petzi2712/ioBroker.iot-glt/main/admin/iot-glt.svg",
+    "readme": "https://github.com/Petzi2712/ioBroker.iot-glt/blob/main/README.md",
+    "loglevel": "info",
+    "tier": 2,
+    "news": {
+      "0.1.0": {
+        "en": "Initial release with building visualization, trends, access control and energy reports",
+        "de": "Erste Version mit Anlagenbildern, Trends, Rechteverwaltung und Energieberichten"
+      }
+    },
+    "dependencies": [
+      { "js-controller": ">=6.0.11" }
+    ],
+    "restartAdapters": []
+  },
+  "native": {
+    "bind": "0.0.0.0",
+    "port": 8095,
+    "historyInstance": "history.0",
+    "emailInstance": "",
+    "defaultReadOnly": true,
+    "sessionHours": 12,
+    "co2Factor": 0.38,
+    "currency": "EUR"
+  },
+  "objects": [],
+  "instanceObjects": [
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": { "name": "Web server connection", "type": "boolean", "role": "indicator.connected", "read": true, "write": false, "def": false },
+      "native": {}
+    },
+    {
+      "_id": "data.config",
+      "type": "state",
+      "common": { "name": "IOT GLT configuration", "type": "string", "role": "json", "read": false, "write": false, "def": "{}" },
+      "native": {}
+    }
+  ]
+}

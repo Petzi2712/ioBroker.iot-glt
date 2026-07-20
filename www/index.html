@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>IOT GLT</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button id="menuToggle" class="brand" aria-expanded="false" aria-controls="sidebar"><span class="brandMark">I</span><span>IOT GLT</span></button>
+    <div class="topStatus"><span id="connectionDot" class="statusDot ok"></span><span id="clock"></span><button id="loginButton" class="quiet">Anmelden</button></div>
+  </header>
+
+  <aside id="sidebar" class="sidebar" aria-hidden="true">
+    <nav id="navigation">
+      <button data-view="alarms"><span>!</span>Betriebs- &amp; Störmeldungen</button>
+      <button data-view="visualization"><span>⌂</span>Visualisierung</button>
+      <button data-view="trends"><span>⌁</span>Trendkurven</button>
+      <button data-view="energy"><span>◫</span>Energiemanagement</button>
+      <button data-view="editor"><span>◇</span>Visualisierung einrichten</button>
+      <button data-view="users"><span>♙</span>User &amp; Rechte</button>
+    </nav>
+    <footer><strong id="sideUser">Gast</strong><small id="sideRole">Nur lesen</small></footer>
+  </aside>
+
+  <main id="workspace" class="workspace">
+    <section id="view-alarms" class="view active">
+      <div class="viewHead"><div><p class="eyebrow">ANLAGENSTATUS</p><h1>Betriebs- &amp; Störmeldungen</h1></div><button id="addAlarm" class="primary">Melderegel anlegen</button></div>
+      <div class="metricGrid">
+        <article class="metric"><span>Aktive Störungen</span><strong id="alarmCount">0</strong><small>Priorität Alarm</small></article>
+        <article class="metric"><span>Warnmeldungen</span><strong id="warningCount">0</strong><small>Grenzwerte beachten</small></article>
+        <article class="metric"><span>Betriebsbereit</span><strong id="okCount">0</strong><small>Überwachte Signale</small></article>
+      </div>
+      <div class="panel"><div class="panelHead"><h2>Meldungsliste</h2><button id="refreshAlarms" class="quiet">Aktualisieren</button></div><div id="alarmList" class="tableList empty">Noch keine Melderegeln eingerichtet.</div></div>
+    </section>
+
+    <section id="view-visualization" class="view">
+      <div class="viewHead"><div><p class="eyebrow">LIVE-ANLAGENBILDER</p><h1>Visualisierung</h1></div><select id="pageSelect"></select></div>
+      <div class="visualShell"><div id="liveCanvas" class="plantCanvas"></div></div>
+    </section>
+
+    <section id="view-trends" class="view">
+      <div class="viewHead"><div><p class="eyebrow">ZEITREIHEN</p><h1>Trendkurven</h1></div><button id="loadTrend" class="primary">Trend laden</button></div>
+      <div class="filterBar">
+        <label>Datenpunkt<input id="trendState" list="stateOptions" placeholder="z. B. hm-rpc.0..." /></label>
+        <label>Von<input id="trendStart" type="datetime-local"></label><label>Bis<input id="trendEnd" type="datetime-local"></label>
+        <label>Darstellung<select id="trendType"><option value="line">Linie</option><option value="bar">Balken</option><option value="pie">Torte</option><option value="heat">Heatmap</option></select></label>
+      </div>
+      <div class="panel chartPanel"><div id="trendMeta" class="panelHead"><h2>Keine Daten geladen</h2></div><div id="trendChart" class="chart"><div class="empty">Datenpunkt und Zeitraum auswählen.</div></div></div>
+    </section>
+
+    <section id="view-energy" class="view">
+      <div class="viewHead"><div><p class="eyebrow">VERBRAUCH · KOSTEN · CO₂</p><h1>Energiemanagement</h1></div><button id="createReport" class="primary">Bericht berechnen</button></div>
+      <div class="filterBar energyFilters">
+        <label>Berichtsname<input id="reportName" value="Energieauswertung"></label>
+        <label>Verbrauchsdatenpunkt<input id="energyState" list="stateOptions" placeholder="kWh-Zähler"></label>
+        <label>Berechnung<select id="energyMode"><option value="counter">Zählerdifferenz</option><option value="sum">Summe</option><option value="average">Mittelwert</option></select></label>
+        <label>Preis / kWh<input id="energyPrice" type="number" step="0.001" value="0.35"></label>
+        <label>kg CO₂ / kWh<input id="energyCo2" type="number" step="0.001" value="0.38"></label>
+        <label>Von<input id="energyStart" type="date"></label><label>Bis<input id="energyEnd" type="date"></label>
+      </div>
+      <div id="reportCards" class="reportGrid"><div class="empty panel">Noch keine Berichte gespeichert.</div></div>
+    </section>
+
+    <section id="view-editor" class="view">
+      <div class="viewHead"><div><p class="eyebrow">ENGINEERING</p><h1>Visualisierung einrichten</h1></div><div class="actions"><button id="newPage" class="quiet">Neues Bild</button><button id="savePages" class="primary">Speichern</button></div></div>
+      <div class="editorLayout">
+        <aside class="toolbox panel">
+          <h2>Werkzeuge</h2>
+          <label>Anlagenbild<select id="editorPageSelect"></select></label>
+          <button id="uploadBackground">Hintergrundbild laden</button><input id="backgroundFile" type="file" accept="image/*" hidden>
+          <button data-add-widget="analog">Analoger Einblendpunkt</button>
+          <button data-add-widget="digital">Digitaler Einblendpunkt</button>
+          <button data-add-widget="heatingCurve">Heizkurve</button>
+          <button data-add-widget="hx">h,x-Diagramm</button>
+          <hr>
+          <div id="widgetInspector" class="inspector"><p class="muted">Ein Element im Anlagenbild auswählen.</p></div>
+        </aside>
+        <div class="visualShell editorShell"><div id="editorCanvas" class="plantCanvas editing"></div></div>
+      </div>
+    </section>
+
+    <section id="view-users" class="view">
+      <div class="viewHead"><div><p class="eyebrow">ZUGRIFFSKONTROLLE</p><h1>User &amp; Rechte</h1></div><button id="newUser" class="primary">User anlegen</button></div>
+      <div class="panel"><div id="userList" class="tableList"></div></div>
+    </section>
+  </main>
+
+  <datalist id="stateOptions"></datalist>
+  <div id="toast" class="toast" role="status"></div>
+
+  <dialog id="modal"><form method="dialog"><header><h2 id="modalTitle">Dialog</h2><button value="cancel" aria-label="Schließen">×</button></header><div id="modalBody"></div><footer id="modalActions"></footer></form></dialog>
+  <div id="tooltip" class="tooltip"></div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>

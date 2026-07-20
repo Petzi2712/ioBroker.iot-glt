@@ -1,0 +1,23 @@
+{
+  "name": "iobroker.iot-glt",
+  "version": "0.1.0",
+  "description": "Responsive building management and energy management adapter for ioBroker",
+  "keywords": ["iobroker", "building", "glt", "energy", "visualization", "raspberry-pi"],
+  "homepage": "https://github.com/Petzi2712/ioBroker.iot-glt",
+  "repository": { "type": "git", "url": "git+https://github.com/Petzi2712/ioBroker.iot-glt.git" },
+  "bugs": { "url": "https://github.com/Petzi2712/ioBroker.iot-glt/issues" },
+  "license": "MIT",
+  "author": "Petzi2712",
+  "main": "main.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node --check main.js && node --check www/app.js && node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@iobroker/adapter-core": "^3.4.3",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {},
+  "files": ["admin", "www", "lib", "main.js", "io-package.json", "README.md", "LICENSE"]
+}
