@@ -7,6 +7,8 @@ IOT GLT ist ein responsiver ioBroker-Adapter für technische Gebäudevisualisier
 ## Funktionen
 
 - Responsive Weboberfläche unter der ioBroker-IP und dem konfigurierten Port
+- Frei konfigurierbares technisches Dashboard mit verschiebbaren und skalierbaren Kacheln
+- Dashboard-Kacheln als Linie, Balken, Heatmap, Füllstand, Messinstrument, Tabelle oder Einzelwert
 - Schmaler, aufklappbarer Split-Screen mit den GLT-Funktionsbereichen
 - Default-Gastzugriff mit Leserechten
 - Benutzerverwaltung mit rollen- und modulbezogenen Lese-/Schreibrechten
@@ -14,8 +16,7 @@ IOT GLT ist ein responsiver ioBroker-Adapter für technische Gebäudevisualisier
 - Dynamische Anlagenbilder mit Hintergrundbildern und frei positionierbaren Einblendpunkten
 - Analoge Einblendpunkte öffnen direkt die zugehörige Trendansicht
 - Schreibbare digitale Datenpunkte können durch berechtigte Benutzer geschaltet werden
-- Visuell editierbare Heizkurven und h,x-Diagramme
-- Trendkurven als Linie, Balken, Torte oder Heatmap inklusive Tooltips
+- Trendkurven als Linie, Stufe, Balken oder Heatmap inklusive Tooltips und mehrseitigem PDF-Export
 - Energieberichte aus Zählerdifferenz, Summe oder Mittelwert
 - Kostenberechnung über einen frei definierbaren kWh-Preis
 - CO₂-Bilanzierung über einen frei definierbaren Emissionsfaktor
@@ -59,10 +60,23 @@ Beim ersten Login verlangt die Oberfläche ein neues Passwort mit mindestens zeh
 | Gastzugriff | aktiv | Nicht angemeldete Benutzer dürfen freigegebene Module lesen |
 | History-Instanz | `history.0` | Quelle für Trend- und Berichtsdaten |
 | E-Mail-Instanz | leer | Optionaler Versand gespeicherter Berichte |
+| VIS-Basisadresse | leer | Adresse des VIS-Webservers, beispielsweise `http://192.168.178.101:8082` |
 | CO₂-Faktor | `0.38 kg/kWh` | Vorgabewert für neue Berichte |
 | Währung | `EUR` | Darstellung der Energiekosten |
 
 Für Trends muss der ausgewählte Datenpunkt in der konfigurierten History-Instanz aufgezeichnet werden.
+
+## Lokale und dauerhafte Speicherung
+
+Benutzer, Passwort-Hashes, Rechte, Anlagenbaum, Visualisierungen, Dashboard-Kacheln, Melderegeln, Berichte und Oberflächeneinstellungen werden ausschließlich im lokalen Instanz-Datenordner des ioBroker-Hosts gespeichert. Die Hauptdatei heißt `iot-glt-model.json`; vor dem Überschreiben wird zusätzlich `iot-glt-model.json.bak` angelegt. Damit bleiben die Daten bei Adapter-Neustarts und Updates erhalten und werden von einer regulären ioBroker-Sicherung des Datenverzeichnisses erfasst. Frühere Konfigurationen aus `iot-glt.0.data.config` werden beim ersten Start automatisch migriert.
+
+## ioBroker-Integration
+
+- Die Datenpunktauswahl liest den ioBroker-Objektbaum direkt über die Adapter-API.
+- Aktuelle Zustände kommen aus der ioBroker-State-Datenbank.
+- Historische Werte werden per `getHistory` aus der ausgewählten `history`- oder `influxdb`-Instanz gelesen.
+- Schreibzugriffe sind nur bei GLT-Schreibrecht und `common.write=true` möglich.
+- VIS-Ansichten werden über die im Anlagenbaum gespeicherte URL geladen. Für relative `/vis-2/...`-Links muss die VIS-Basisadresse konfiguriert sein.
 
 ## Sicherheit
 

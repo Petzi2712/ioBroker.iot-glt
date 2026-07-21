@@ -11,8 +11,8 @@
   "main": "main.js",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test": "node --test test/*.test.js",
-    "check": "node --check main.js && node --check www/app.js && node --test test/*.test.js"
+    "test": "node test/energy.test.js && node test/integration-contract.test.js && node test/metadata.test.js && node test/security.test.js",
+    "check": "node --check main.js && node --check www/app.js && node test/energy.test.js && node test/integration-contract.test.js && node test/metadata.test.js && node test/security.test.js"
   },
   "dependencies": {
     "@iobroker/adapter-core": "^3.4.3",

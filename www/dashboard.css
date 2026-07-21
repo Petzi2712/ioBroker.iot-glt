@@ -1,0 +1,4 @@
+.dashboardSvg .gaugeTrack{fill:none;stroke:#d1d5dc;stroke-width:18;stroke-linecap:round}
+.dashboardSvg .gaugeValue{fill:none;stroke:var(--accent);stroke-width:18;stroke-linecap:round}
+.dashboardSvg .chartGrid{stroke:var(--line);stroke-width:1}
+.dashboardSvg .chartLabel{fill:var(--muted);font-size:11px}
