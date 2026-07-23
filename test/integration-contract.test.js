@@ -63,6 +63,30 @@ test('trend CSV, line width and reversible zoom are wired', () => {
   assert.match(app, /restorePreviousTrendZoom/);
 });
 
+test('trend and energy CSV exports include every visible series in value-unit pairs', () => {
+  assert.match(app, /function wideSeriesCsv\(datasets\)/);
+  assert.match(app, /\['Datum', 'Uhrzeit', 'Datenpunktname'\]/);
+  assert.match(app, /`Wert \$\{index \+ 1\}`/);
+  assert.match(app, /downloadCsv\(state\.trendData, 'Trend'\)/);
+  assert.match(app, /downloadCsv\(state\.energyData, 'Energie'\)/);
+});
+
+test('energy analysis supports imported CSV data and all requested diagrams', () => {
+  assert.match(app, /importEnergyCsv/);
+  assert.match(app, /bindEnergyNavigation/);
+  assert.match(app, /type === 'stackedBar'/);
+  assert.match(app, /type === 'pie' \|\| type === 'donut'/);
+  const html = fs.readFileSync(path.join(root, 'www', 'index.html'), 'utf8');
+  assert.match(html, /id="energyChartType"/);
+  assert.match(html, /value="heat"/);
+});
+
+test('the CSP-safe color palette contains sixteen visible CSS colors', () => {
+  const styles = fs.readFileSync(path.join(root, 'www', 'styles.css'), 'utf8');
+  for (let index = 0; index < 16; index += 1) assert.match(styles, new RegExp(`\\.paletteColor${index}\\{background-color:`));
+  assert.doesNotMatch(app, /data-palette-color="[^"]+"[^>]+style=/);
+});
+
 test('unauthorized sidebar entries are removed from layout', () => {
   assert.match(app, /permission-hidden/);
   const styles = fs.readFileSync(path.join(root, 'www', 'styles.css'), 'utf8');
