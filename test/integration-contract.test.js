@@ -54,3 +54,22 @@ test('themes, energy history and trend interaction are wired', () => {
   assert.match(app, /bindTrendNavigation/);
   assert.match(app, /multiTrendSvg/);
 });
+
+test('trend CSV, line width and reversible zoom are wired', () => {
+  assert.match(app, /importTrendCsv/);
+  assert.match(app, /exportTrendCsv/);
+  assert.match(app, /trendLineWidth/);
+  assert.match(app, /trendZoomHistory/);
+  assert.match(app, /restorePreviousTrendZoom/);
+});
+
+test('unauthorized sidebar entries are removed from layout', () => {
+  assert.match(app, /permission-hidden/);
+  const styles = fs.readFileSync(path.join(root, 'www', 'styles.css'), 'utf8');
+  assert.match(styles, /button\.permission-hidden\{display:none!important\}/);
+});
+
+test('password UI keeps existing secrets non-recoverable', () => {
+  assert.match(app, /bestehende Passwort ist durch den sicheren Hash nicht auslesbar/);
+  assert.doesNotMatch(main, /user\.(?:plainPassword|passwordPlain|currentPassword)|passwordPlain\s*:/i);
+});
