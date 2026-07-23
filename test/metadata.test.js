@@ -12,7 +12,7 @@ const io = JSON.parse(fs.readFileSync(path.join(root, 'io-package.json'), 'utf8'
 test('package and io-package versions match', () => assert.equal(pkg.version, io.common.version));
 test('adapter uses the required GitHub repository', () => assert.match(pkg.repository.url, /Petzi2712\/ioBroker\.iot-glt/));
 test('all runtime entry files exist', () => {
-  for (const file of ['main.js', 'admin/jsonConfig.json', 'www/index.html', 'www/app.js', 'www/styles.css']) {
+  for (const file of ['main.js', 'admin/jsonConfig.json', 'admin/iot-glt.svg', 'www/index.html', 'www/app.js', 'www/styles.css', 'www/glt-logo.svg']) {
     assert.equal(fs.existsSync(path.join(root, file)), true, file);
   }
 });

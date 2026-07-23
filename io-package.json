@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "iot-glt",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "titleLang": { "en": "IOT GLT", "de": "IOT GLT" },
     "desc": {
       "en": "Building management visualization, trends and energy reports",
@@ -23,6 +23,10 @@
     "loglevel": "info",
     "tier": 2,
     "news": {
+      "0.2.0": {
+        "en": "New responsive shell, themes, energy history workspace, object picker and refined user permissions",
+        "de": "Neue responsive Oberfläche, Farbschemata, Energie-Historie, Objektauswahl und verfeinerte Benutzerrechte"
+      },
       "0.1.0": {
         "en": "Initial release with building visualization, trends, access control and energy reports",
         "de": "Erste Version mit Anlagenbildern, Trends, Rechteverwaltung und Energieberichten"

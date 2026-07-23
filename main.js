@@ -5,6 +5,7 @@ const fs = require('node:fs/promises');
 const crypto = require('node:crypto');
 const express = require('express');
 const utils = require('@iobroker/adapter-core');
+const packageJson = require('./package.json');
 const { MODULES, hashPassword, verifyPassword, defaultPermissions, can } = require('./lib/security');
 const { calculateEnergyReport } = require('./lib/energy');
 
@@ -70,7 +71,7 @@ class IotGltAdapter extends utils.Adapter {
       dashboardWidgets: [{ id: 'adapter-connection', title: 'IOT GLT Verbindung', stateId: `${this.namespace}.info.connection`, unit: '', type: 'value', period: 1, min: 0, max: 1, cols: 3, rows: 3 }],
       alarmDefinitions: [],
       reports: [],
-      settings: { siteName: 'Gebäude Zentrale', accent: '#fe6e00', fontFamily: 'apple', autoLogoffMinutes: 30, ioBrokerAdminUrl: '' }
+      settings: { siteName: 'Gebäude Zentrale', accent: '#fe6e00', fontFamily: 'apple', theme: 'light', autoLogoffMinutes: 30, ioBrokerAdminUrl: '' }
     };
     const model = { ...defaults, ...stored };
     model.users = Array.isArray(model.users) && model.users.length ? model.users : defaults.users;
@@ -87,6 +88,10 @@ class IotGltAdapter extends utils.Adapter {
       user.failedLoginAttempts = Number(user.failedLoginAttempts) || 0;
       user.locked = Boolean(user.locked);
       user.lockedUntil = Number(user.lockedUntil) || null;
+      user.lastLoginAt = Number(user.lastLoginAt) || null;
+      user.lastSeenAt = Number(user.lastSeenAt) || null;
+      user.loginCount = Number(user.loginCount) || 0;
+      if (Array.isArray(user.allowedNavigationIds)) user.allowedNavigationIds = [...new Set(user.allowedNavigationIds.map(String))];
     });
     model.pages = Array.isArray(model.pages) && model.pages.length ? model.pages : defaults.pages;
     model.navigationTree = Array.isArray(model.navigationTree) && model.navigationTree.length ? model.navigationTree : defaults.navigationTree;
@@ -118,7 +123,12 @@ class IotGltAdapter extends utils.Adapter {
     if (!session || session.expires < Date.now()) return null;
     session.expires = Date.now() + Math.max(5, Number(this.model.settings.autoLogoffMinutes) || 30) * 60000;
     const user = this.model.users.find(item => item.id === session.userId);
-    return user && !user.locked ? { ...user, passwordHash: undefined, csrf: session.csrf } : null;
+    if (!user || user.locked) return null;
+    if (!user.lastSeenAt || Date.now() - user.lastSeenAt > 60000) {
+      user.lastSeenAt = Date.now();
+      this.saveModel().catch(error => this.log.warn(`Could not persist user activity: ${error.message}`));
+    }
+    return { ...user, passwordHash: undefined, csrf: session.csrf };
   }
 
   publicUser() {
@@ -161,6 +171,21 @@ class IotGltAdapter extends utils.Adapter {
   cleanUser(user) {
     const { passwordHash, ...safe } = user;
     return safe;
+  }
+
+  navigationForUser(user) {
+    const tree = this.model.navigationTree || [];
+    if (!user || user.role === 'admin' || !Array.isArray(user.allowedNavigationIds)) return tree;
+    const visible = new Set(user.allowedNavigationIds);
+    const byId = new Map(tree.map(node => [node.id, node]));
+    for (const id of [...visible]) {
+      let parentId = byId.get(id)?.parentId;
+      while (parentId && !visible.has(parentId)) {
+        visible.add(parentId);
+        parentId = byId.get(parentId)?.parentId;
+      }
+    }
+    return tree.filter(node => visible.has(node.id));
   }
 
   sendToPromise(instance, command, message) {
@@ -223,10 +248,10 @@ class IotGltAdapter extends utils.Adapter {
         mustChangePassword: Boolean(user?.mustChangePassword),
         modules: user ? Object.fromEntries(MODULES.map(key => [key, ['users', 'iobroker', 'settings'].includes(key) ? user.role === 'admin' : (user.role === 'admin' || user.permissions?.[key]?.read)])) : {},
         pages: can(user, 'visualization') ? this.model.pages : [],
-        navigationTree: can(user, 'visualization') ? this.model.navigationTree : [],
+        navigationTree: can(user, 'visualization') ? this.navigationForUser(user) : [],
         dashboardWidgets: can(user, 'dashboard') ? this.model.dashboardWidgets : [],
         settings: this.model.settings,
-        adapter: { name: this.name, instance: this.instance, currency: this.config.currency || 'EUR', co2Factor: Number(this.config.co2Factor || 0.38), visBaseUrl: String(this.config.visBaseUrl || ''), historySources: [{ type: 'history', instance: this.config.historyInstance }, { type: 'influxdb', instance: this.config.influxInstance }].filter(source => source.instance) }
+        adapter: { name: this.name, instance: this.instance, version: packageJson.version, currency: this.config.currency || 'EUR', co2Factor: Number(this.config.co2Factor || 0.38), visBaseUrl: String(this.config.visBaseUrl || ''), historySources: [{ type: 'history', instance: this.config.historyInstance }, { type: 'influxdb', instance: this.config.influxInstance }].filter(source => source.instance) }
       });
     });
 
@@ -248,6 +273,9 @@ class IotGltAdapter extends utils.Adapter {
       user.locked = false;
       user.lockedAt = null;
       user.lockedUntil = null;
+      user.lastLoginAt = Date.now();
+      user.lastSeenAt = user.lastLoginAt;
+      user.loginCount = (Number(user.loginCount) || 0) + 1;
       await this.saveModel();
       const token = crypto.randomBytes(32).toString('hex');
       const csrf = crypto.randomBytes(24).toString('hex');
@@ -285,7 +313,7 @@ class IotGltAdapter extends utils.Adapter {
       res.json({ ok: true });
     });
 
-    app.get('/api/states', this.requirePermission('editor'), async (req, res, next) => {
+    app.get('/api/states', this.requireAnyPermission(['dashboard', 'alarms', 'visualization', 'trends', 'energy', 'editor']), async (req, res, next) => {
       try {
         const query = String(req.query.query || '').toLowerCase();
         const objects = await this.getForeignObjectsAsync('*', 'state');
@@ -295,7 +323,7 @@ class IotGltAdapter extends utils.Adapter {
       } catch (error) { next(error); }
     });
 
-    app.get('/api/trend-states', this.requirePermission('trends'), async (req, res, next) => {
+    app.get('/api/trend-states', this.requireAnyPermission(['trends', 'energy']), async (req, res, next) => {
       try {
         const query = String(req.query.query || '').toLowerCase();
         const objects = await this.getForeignObjectsAsync('*', 'state');
@@ -352,10 +380,10 @@ class IotGltAdapter extends utils.Adapter {
       } catch (error) { next(error); }
     });
 
-    app.get('/api/history', this.requireAnyPermission(['dashboard', 'trends']), async (req, res, next) => {
+    app.get('/api/history', this.requireAnyPermission(['dashboard', 'trends', 'energy']), async (req, res, next) => {
       try {
         const requestedId = String(req.query.id || '');
-        if (!can(req.gltUser, 'trends') && !this.model.dashboardWidgets.some(widget => (widget.stateId || widget.dp) === requestedId)) return res.status(403).json({ error: 'Datenpunkt ist nicht für das Dashboard freigegeben' });
+        if (!can(req.gltUser, 'trends') && !can(req.gltUser, 'energy') && !this.model.dashboardWidgets.some(widget => (widget.stateId || widget.dp) === requestedId)) return res.status(403).json({ error: 'Datenpunkt ist nicht für das Dashboard freigegeben' });
         const end = Number(req.query.end) || Date.now();
         const start = Number(req.query.start) || end - 86400000;
         const allowedSources = new Set([this.config.historyInstance, this.config.influxInstance].filter(Boolean));
@@ -431,6 +459,7 @@ class IotGltAdapter extends utils.Adapter {
     app.put('/api/settings', this.requirePermission('settings', 'write'), async (req, res) => {
       this.model.settings.siteName = String(req.body?.siteName || 'Gebäude Zentrale').trim().slice(0, 120) || 'Gebäude Zentrale';
       this.model.settings.fontFamily = req.body?.fontFamily === 'material' ? 'material' : 'apple';
+      this.model.settings.theme = ['light', 'dark', 'system'].includes(req.body?.theme) ? req.body.theme : 'light';
       this.model.settings.autoLogoffMinutes = Math.max(5, Math.min(1440, Number(req.body?.autoLogoffMinutes) || 30));
       this.model.settings.ioBrokerAdminUrl = String(req.body?.ioBrokerAdminUrl || '').trim().slice(0, 2048);
       await this.saveModel();
@@ -456,6 +485,12 @@ class IotGltAdapter extends utils.Adapter {
       user.email = String(input.email || '').slice(0, 254);
       user.phone = String(input.phone || '').slice(0, 80);
       user.notes = String(input.notes || '').slice(0, 4000);
+      if (Array.isArray(input.allowedNavigationIds)) {
+        const validIds = new Set(this.model.navigationTree.map(node => node.id));
+        user.allowedNavigationIds = [...new Set(input.allowedNavigationIds.map(String).filter(id => validIds.has(id)))];
+      } else if (user.role === 'admin') {
+        delete user.allowedNavigationIds;
+      }
       if (user.role === 'admin') user.permissions = defaultPermissions('admin');
       else {
         const requested = input.permissions || {};
@@ -489,9 +524,12 @@ class IotGltAdapter extends utils.Adapter {
     app.post('/api/reports', this.requirePermission('energy', 'write'), async (req, res, next) => {
       try {
         const spec = req.body || {};
-        const values = await this.history(String(spec.stateId), Number(spec.start), Number(spec.end), 'none', 5000);
+        const allowedSources = new Set([this.config.historyInstance, this.config.influxInstance].filter(Boolean));
+        const source = String(spec.source || this.config.historyInstance || this.config.influxInstance || '');
+        if (!allowedSources.has(source)) return res.status(400).json({ error: 'Zeitreihenquelle ist nicht konfiguriert' });
+        const values = await this.history(String(spec.stateId), Number(spec.start), Number(spec.end), 'none', 5000, source);
         const result = calculateEnergyReport({ series: values, mode: spec.mode, pricePerKwh: spec.pricePerKwh, co2Factor: spec.co2Factor ?? this.config.co2Factor });
-        const report = { id: crypto.randomUUID(), createdAt: Date.now(), createdBy: req.gltUser.username, name: String(spec.name || 'Energiebericht'), stateId: String(spec.stateId), start: Number(spec.start), end: Number(spec.end), mode: spec.mode || 'counter', pricePerKwh: Number(spec.pricePerKwh || 0), co2Factor: Number(spec.co2Factor ?? this.config.co2Factor), ...result };
+        const report = { id: crypto.randomUUID(), createdAt: Date.now(), createdBy: req.gltUser.username, name: String(spec.name || 'Energiebericht'), stateId: String(spec.stateId), source, start: Number(spec.start), end: Number(spec.end), mode: spec.mode || 'counter', pricePerKwh: Number(spec.pricePerKwh || 0), co2Factor: Number(spec.co2Factor ?? this.config.co2Factor), ...result };
         this.model.reports.unshift(report);
         this.model.reports = this.model.reports.slice(0, 500);
         await this.saveModel();

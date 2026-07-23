@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-labelledby="title description">
+  <title id="title">IOT GLT</title>
+  <desc id="description">Abstraktes GLT-Logo aus Kreis, Quadrat und zentralem Steuerpunkt.</desc>
   <rect x="18" y="18" width="476" height="476" rx="112" fill="#FCFAF7"/>
   <g stroke="#423D38" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
     <path d="M292 206A112 112 0 1 0 218 312"/>

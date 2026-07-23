@@ -2,7 +2,7 @@
 
 IOT GLT ist ein responsiver ioBroker-Adapter für technische Gebäudevisualisierung, Betriebs- und Störmeldungen, Trends sowie Energie- und CO₂-Auswertungen. Der Adapter enthält ausschließlich JavaScript-Abhängigkeiten und eignet sich damit auch für aktuelle Raspberry-Pi-Systeme mit unterstützter Node.js-Version.
 
-> Status: frühe Version `0.1.0`. Vor einem produktiven Einsatz sind Anlagen-, Sicherheits- und Ausfalltests in der Zielumgebung erforderlich.
+> Status: frühe Version `0.2.0`. Vor einem produktiven Einsatz sind Anlagen-, Sicherheits- und Ausfalltests in der Zielumgebung erforderlich.
 
 ## Funktionen
 
@@ -10,13 +10,15 @@ IOT GLT ist ein responsiver ioBroker-Adapter für technische Gebäudevisualisier
 - Frei konfigurierbares technisches Dashboard mit verschiebbaren und skalierbaren Kacheln
 - Dashboard-Kacheln als Linie, Balken, Heatmap, Füllstand, Messinstrument, Tabelle oder Einzelwert
 - Schmaler, aufklappbarer Split-Screen mit den GLT-Funktionsbereichen
+- Helle Evreghen-Oberfläche, Darkmodus oder automatische Systemdarstellung
 - Default-Gastzugriff mit Leserechten
-- Benutzerverwaltung mit rollen- und modulbezogenen Lese-/Schreibrechten
+- Benutzerverwaltung mit Volltextsuche, sortierbarer Tabelle, Aktivitätsdaten sowie rollen-, modul- und anlagenbezogenen Rechten
 - Betriebs-, Warn- und Störmeldungen mit frei konfigurierbaren Datenpunktregeln
 - Dynamische Anlagenbilder mit Hintergrundbildern und frei positionierbaren Einblendpunkten
 - Analoge Einblendpunkte öffnen direkt die zugehörige Trendansicht
 - Schreibbare digitale Datenpunkte können durch berechtigte Benutzer geschaltet werden
-- Trendkurven als Linie, Stufe, Balken oder Heatmap inklusive Tooltips und mehrseitigem PDF-Export
+- Trendkurven als Linie, Stufe, Balken, Torte oder Heatmap inklusive Mehrfachachsen, Zoom/Zeitauswahl, Tooltips, Farbpalette und PDF-Export
+- Historischer Analysebereich im Energiemanagement mit History- und InfluxDB-Daten
 - Energieberichte aus Zählerdifferenz, Summe oder Mittelwert
 - Kostenberechnung über einen frei definierbaren kWh-Preis
 - CO₂-Bilanzierung über einen frei definierbaren Emissionsfaktor
@@ -77,6 +79,7 @@ Benutzer, Passwort-Hashes, Rechte, Anlagenbaum, Visualisierungen, Dashboard-Kach
 - Historische Werte werden per `getHistory` aus der ausgewählten `history`- oder `influxdb`-Instanz gelesen.
 - Schreibzugriffe sind nur bei GLT-Schreibrecht und `common.write=true` möglich.
 - VIS-Ansichten werden über die im Anlagenbaum gespeicherte URL geladen. Für relative `/vis-2/...`-Links muss die VIS-Basisadresse konfiguriert sein.
+- Webseiten dürfen nur eingebettet werden, wenn der Zielserver dies über seine `X-Frame-Options`- und CSP-Header erlaubt. Gesperrte Ziele können über „Ansicht extern öffnen“ aufgerufen werden; sicherheitsrelevante Header fremder Server werden nicht umgangen.
 
 ## Sicherheit
 
