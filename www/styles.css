@@ -78,3 +78,25 @@ html[data-theme="dark"] .colorPalette{background:#352f2a}
 .plantPermissionList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:220px;overflow:auto;padding:9px;border:1px solid var(--line);border-radius:7px}.plantPermissionList label{display:flex!important;align-items:center;gap:8px!important;padding:5px}.plantPermissionList input{width:auto!important}
 @media(max-width:900px){.workspace,.menu-open .workspace{margin-left:var(--sidebar-collapsed)}.sidebar,.menu-open .sidebar{width:var(--sidebar-collapsed)}.menu-open .navLabel{opacity:0}.visualizationLayout{grid-template-columns:230px minmax(0,1fr)}}
 @media(max-width:600px){.topbar{padding-left:64px}.sectionToggle{width:100%}.chartPanel .chart,.energyHistoryPanel .chart,.settings-collapsed .chartPanel .chart,.energy-settings-collapsed .energyHistoryPanel .chart{height:58vh;min-height:360px}.plantPermissionList{grid-template-columns:1fr}.userTableViewport{max-height:65vh}}
+
+/* IOT GLT 0.2 refinements */
+:root{--sidebar-expanded:276px}
+.sidebar nav button[hidden],.sidebar nav button.permission-hidden{display:none!important}
+.sidebar nav{align-content:start;grid-auto-flow:row}
+.sidebar nav button{height:auto;min-height:42px;grid-template-columns:40px minmax(0,1fr);overflow:visible}
+.navLabel{overflow:visible;text-overflow:clip;white-space:normal;font-size:.79rem;font-weight:500;line-height:1.22}
+.hamburgerToggle{display:grid!important;place-items:center;flex:0 0 42px;width:42px;height:40px;padding:0!important}
+.hamburgerToggleIcon{display:grid!important;gap:4px;width:18px;color:currentColor!important}
+.hamburgerToggleIcon i{display:block;width:18px;height:2px;border-radius:2px;background:currentColor}
+.trendControls,.energyControls{display:grid;gap:10px;overflow:hidden;max-height:760px;opacity:1;transition:max-height 250ms ease,opacity 180ms ease,margin 250ms ease}
+.trendControls>.actions,.energyControls>.actions{justify-content:flex-end;flex-wrap:wrap}
+.trendControls.collapsed,.energyControls.collapsed{max-height:0;opacity:0;margin:0}
+.chartPanel{position:relative}.zoomBack{position:absolute;z-index:7;top:12px;left:12px;width:40px;height:36px;padding:0;font-size:1.35rem;background:var(--surface-elevated)}
+.tooltip{z-index:1200;max-width:min(420px,calc(100vw - 24px));padding:10px 12px;border-color:#d1d5dc;background:#fff;color:#292524;font-size:.8rem;line-height:1.45;box-shadow:0 8px 24px #0003}
+html[data-theme="dark"] .tooltip{border-color:#756b62;background:#211d1a;color:#fafaf9}
+.colorPalette button[data-palette-color]{background-image:none!important;opacity:1!important;filter:none!important}
+.pill.alarm{background:#b42318;color:#fff;font-weight:700}.pill.warning{background:#9a6700;color:#fff;font-weight:700}.pill.ok{background:#067647;color:#fff;font-weight:700}
+html[data-theme="dark"] .pill.alarm{background:#ff5a65;color:#180305}html[data-theme="dark"] .pill.warning{background:#f4c34d;color:#281b00}html[data-theme="dark"] .pill.ok{background:#39d98a;color:#062317}
+.passwordResetField{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}.passwordResetField .quiet{white-space:nowrap}.personForm label>small{margin-top:2px;color:var(--muted);line-height:1.35}
+.ioBrokerWorkspace{height:calc(100vh - 88px)}.ioBrokerWorkspace .ioBrokerPanel{position:relative;height:100%;padding:0;overflow:hidden}.ioBrokerPanelToolbar{position:absolute;z-index:3;top:8px;right:8px}.ioBrokerPanelToolbar .buttonLink{background:var(--surface-elevated);box-shadow:var(--shadow)}.ioBrokerPanel iframe{height:100%}
+@media(max-width:900px){.sidebar nav button{grid-template-columns:40px minmax(0,1fr)}.menu-open .navLabel{opacity:0}.trendControls>.actions,.energyControls>.actions{justify-content:flex-start}}

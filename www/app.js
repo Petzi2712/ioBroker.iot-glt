@@ -2,7 +2,7 @@
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const state = { bootstrap: null, user: null, csrf: '', pages: [], navigationTree: [], selectedTreeId: '', expandedTreeIds: new Set(), currentView: 'dashboard', editorPage: 0, selectedWidget: null, stateCache: new Map(), reports: [], trendSeries: [], trendData: [], energySeries: [], energyData: [], users: [], userSearch: '', userSort: { key: 'displayName', direction: 1 }, autoLogoutTimer: null, lastKeepAlive: 0, treeDragActive: false, dashboardEdit: false, dashboardActiveId: null, dashboardWidgets: [] };
+const state = { bootstrap: null, user: null, csrf: '', pages: [], navigationTree: [], selectedTreeId: '', expandedTreeIds: new Set(), currentView: 'dashboard', editorPage: 0, selectedWidget: null, stateCache: new Map(), reports: [], trendSeries: [], trendData: [], trendZoomHistory: [], trendWheelSession: 0, energySeries: [], energyData: [], users: [], userSearch: '', userSort: { key: 'displayName', direction: 1 }, autoLogoutTimer: null, lastKeepAlive: 0, treeDragActive: false, dashboardEdit: false, dashboardActiveId: null, dashboardWidgets: [] };
 const uid = () => globalThis.crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 function escapeHtml(value) {
@@ -23,6 +23,16 @@ function toast(message, error = false) {
   node.className = `toast show${error ? ' error' : ''}`;
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => node.className = 'toast', 3500);
+}
+
+function showTooltipAt(tooltip, clientX, clientY) {
+  tooltip.style.display = 'block';
+  const rect = tooltip.getBoundingClientRect();
+  const left = Math.max(8, Math.min(innerWidth - rect.width - 8, clientX + 14));
+  const preferredTop = clientY + 14;
+  const top = preferredTop + rect.height <= innerHeight - 8 ? preferredTop : Math.max(8, clientY - rect.height - 14);
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${top}px`;
 }
 
 function dateTimeValue(timestamp) {
@@ -130,8 +140,11 @@ async function bootstrap() {
   $('#sideVersion').textContent = data.adapter?.version || '0.0.0';
   $$('#navigation button').forEach(button => {
     const module = button.dataset.view;
-    button.hidden = !data.modules?.[module];
-    button.disabled = !data.modules?.[module];
+    const allowed = data.modules?.[module] === true;
+    button.hidden = !allowed;
+    button.classList.toggle('permission-hidden', !allowed);
+    button.disabled = !allowed;
+    button.setAttribute('aria-hidden', String(!allowed));
   });
   $('#addAlarm').hidden = !can('alarms', 'write');
   $('#dashboardEdit').hidden = !can('dashboard', 'write');
@@ -181,7 +194,7 @@ function toggleSettingsPanel(button, panel, view, collapsedClass) {
   panel.classList.toggle('collapsed', collapsed);
   view.classList.toggle(collapsedClass, collapsed);
   button.setAttribute('aria-expanded', String(!collapsed));
-  button.textContent = collapsed ? 'Einstellungen ausklappen' : 'Einstellungen einklappen';
+  button.setAttribute('aria-label', collapsed ? 'Werkzeuge einblenden' : 'Werkzeuge ausblenden');
 }
 
 function resetAutoLogout() {
@@ -623,8 +636,9 @@ function trendColor(index) {
 
 const trendPalette = ['#2f80ed','#56ccf2','#27ae60','#6fcf97','#f2994a','#f2c94c','#eb5757','#ff7a90','#9b51e0','#bb6bd9','#34495e','#7f8c8d','#00a8a8','#8d6e63','#c2185b','#5c6bc0'];
 
-function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = null, rangeEnd = null) {
+function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = null, rangeEnd = null, requestedLineWidth = 2.5) {
   const width = 1000, height = 350, top = 18, bottom = 42;
+  const lineWidth = Math.max(.5, Math.min(12, Number(requestedLineWidth) || 2.5));
   const all = datasets.flatMap(dataset => dataset.values);
   if (!all.length) return '<div class="empty">Für diese Auswahl wurden keine numerischen Werte gefunden.</div>';
   const start = rangeStart ?? new Date($('#trendStart').value).getTime(), end = rangeEnd ?? new Date($('#trendEnd').value).getTime();
@@ -683,7 +697,7 @@ function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = 
     } else {
       const points = dataset.values.map(item => `${x(item.ts)},${y(item.val,unit)}`);
       const path = type === 'step' ? points.map((point,index) => index ? `${points[index-1].split(',')[0]},${point.split(',')[1]} ${point}` : point).join(' ') : points.join(' ');
-      marks += `<polyline points="${path}" fill="none" stroke="${dataset.color}" stroke-width="2.5"/>`;
+      marks += `<polyline points="${path}" fill="none" stroke="${dataset.color}" stroke-width="${lineWidth}"/>`;
     }
   });
   return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${datasets.length} Zeitreihen mit Achsen für ${units.map(escapeHtml).join(', ')}">${grid}${axes}${marks}<text class="chartLabel" x="${left}" y="342">${new Date(start).toLocaleString('de-DE')}</text><text class="chartLabel" text-anchor="end" x="${width-right}" y="342">${new Date(end).toLocaleString('de-DE')}</text><rect class="multiChartHover" x="${left}" y="${top}" width="${width-left-right}" height="${plotHeight}" fill="transparent"/></svg>`;
@@ -696,7 +710,7 @@ function renderTrendLegend() {
 function openTrendColorPalette(seriesId, anchor) {
   const palette = $('#trendColorPalette'), rect = anchor.getBoundingClientRect();
   palette.dataset.seriesId = seriesId;
-  palette.innerHTML = trendPalette.map(color => `<button type="button" style="--palette-color:${color};background-color:${color}" data-palette-color="${color}" aria-label="Farbe ${color}"></button>`).join('');
+  palette.innerHTML = trendPalette.map(color => `<button type="button" style="--palette-color:${color};background:${color}!important;background-color:${color}!important" data-palette-color="${color}" aria-label="Farbe ${color}"></button>`).join('');
   palette.hidden = false;
   const paletteRect = palette.getBoundingClientRect();
   palette.style.left = `${Math.max(8, Math.min(innerWidth - paletteRect.width - 8, rect.left))}px`;
@@ -705,18 +719,51 @@ function openTrendColorPalette(seriesId, anchor) {
 }
 
 function renderCurrentTrend() {
-  $('#trendChart').innerHTML = multiTrendSvg(state.trendData, $('#trendType').value, $('#trendMin').value, $('#trendMax').value);
+  $('#trendChart').innerHTML = multiTrendSvg(state.trendData, $('#trendType').value, $('#trendMin').value, $('#trendMax').value, null, null, $('#trendLineWidth').value);
   renderTrendLegend();
+  $('#trendZoomBack').hidden = !state.trendZoomHistory.length;
   const hover = $('.multiChartHover'), tooltip = $('#tooltip');
   if (!hover) return;
   hover.addEventListener('pointermove', event => {
     const rect = hover.getBoundingClientRect(), ratio = Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)), start = new Date($('#trendStart').value).getTime(), end = new Date($('#trendEnd').value).getTime(), timestamp = start + ratio * (end-start);
     const nearest = state.trendData.map(dataset => ({ dataset, point: dataset.values.reduce((best,item) => !best || Math.abs(item.ts-timestamp)<Math.abs(best.ts-timestamp) ? item : best, null) })).filter(item => item.point);
     tooltip.innerHTML = `<strong>${new Date(timestamp).toLocaleString('de-DE')}</strong>${nearest.map(item => `<br><span style="color:${item.dataset.color}">●</span> ${escapeHtml(item.dataset.name)}: ${number(item.point.val,3)} ${escapeHtml(item.dataset.unit || '')}`).join('')}`;
-    tooltip.style.left = `${event.clientX + 12}px`; tooltip.style.top = `${event.clientY + 12}px`; tooltip.style.display = 'block';
+    showTooltipAt(tooltip, event.clientX, event.clientY);
   });
   hover.addEventListener('pointerleave', () => tooltip.style.display = 'none');
   bindTrendNavigation();
+}
+
+function trendViewSnapshot() {
+  return {
+    start: $('#trendStart').value,
+    end: $('#trendEnd').value,
+    min: $('#trendMin').value,
+    max: $('#trendMax').value,
+    period: $('#trendPeriod').value
+  };
+}
+
+function pushTrendZoom() {
+  const snapshot = trendViewSnapshot();
+  const latest = state.trendZoomHistory.at(-1);
+  if (!latest || JSON.stringify(latest) !== JSON.stringify(snapshot)) state.trendZoomHistory.push(snapshot);
+  if (state.trendZoomHistory.length > 30) state.trendZoomHistory.shift();
+  $('#trendZoomBack').hidden = false;
+}
+
+async function restorePreviousTrendZoom() {
+  const previous = state.trendZoomHistory.pop();
+  if (!previous) return;
+  const timeChanged = previous.start !== $('#trendStart').value || previous.end !== $('#trendEnd').value;
+  $('#trendStart').value = previous.start;
+  $('#trendEnd').value = previous.end;
+  $('#trendMin').value = previous.min;
+  $('#trendMax').value = previous.max;
+  $('#trendPeriod').value = previous.period;
+  $('#trendZoomBack').hidden = !state.trendZoomHistory.length;
+  if (timeChanged) await loadTrend();
+  else renderCurrentTrend();
 }
 
 function bindTrendNavigation() {
@@ -728,6 +775,8 @@ function bindTrendNavigation() {
     let min = $('#trendMin').value === '' ? Math.min(...values) : Number($('#trendMin').value);
     let max = $('#trendMax').value === '' ? Math.max(...values) : Number($('#trendMax').value);
     if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return;
+    if (Date.now() - state.trendWheelSession > 450) pushTrendZoom();
+    state.trendWheelSession = Date.now();
     const factor = event.deltaY < 0 ? .82 : 1.22;
     const center = min + (1 - Math.max(0, Math.min(1, event.offsetY / Math.max(1, chart.clientHeight)))) * (max - min);
     min = center - (center - min) * factor;
@@ -737,6 +786,7 @@ function bindTrendNavigation() {
     renderCurrentTrend();
   };
   chart.ondblclick = () => {
+    pushTrendZoom();
     $('#trendMin').value = '';
     $('#trendMax').value = '';
     renderCurrentTrend();
@@ -766,6 +816,7 @@ function bindTrendNavigation() {
       const oldEnd = new Date($('#trendEnd').value).getTime();
       const leftRatio = Math.min(startX, endX) / rect.width;
       const rightRatio = Math.max(startX, endX) / rect.width;
+      pushTrendZoom();
       $('#trendStart').value = dateTimeValue(oldStart + leftRatio * (oldEnd - oldStart));
       $('#trendEnd').value = dateTimeValue(oldStart + rightRatio * (oldEnd - oldStart));
       $('#trendPeriod').value = 'custom';
@@ -776,14 +827,116 @@ function bindTrendNavigation() {
   };
 }
 
+function parseCsvRow(line, delimiter) {
+  const values = [];
+  let value = '', quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === '"') {
+      if (quoted && line[index + 1] === '"') { value += '"'; index += 1; }
+      else quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      values.push(value.trim());
+      value = '';
+    } else value += char;
+  }
+  values.push(value.trim());
+  return values;
+}
+
+function parseCsvTimestamp(value) {
+  const raw = String(value || '').trim();
+  if (/^\d{10,13}$/.test(raw)) {
+    const numeric = Number(raw);
+    return raw.length === 10 ? numeric * 1000 : numeric;
+  }
+  const german = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (german) return new Date(Number(german[3]), Number(german[2]) - 1, Number(german[1]), Number(german[4] || 0), Number(german[5] || 0), Number(german[6] || 0)).getTime();
+  return Date.parse(raw);
+}
+
+async function importTrendCsv(file) {
+  if (!file) return;
+  if (file.size > 15 * 1024 * 1024) throw new Error('Die CSV-Datei darf maximal 15 MB groß sein');
+  const text = (await file.text()).replace(/^\uFEFF/, '');
+  const lines = text.split(/\r?\n/).filter(line => line.trim());
+  if (lines.length < 2) throw new Error('Die CSV-Datei enthält keine Datenzeilen');
+  const candidates = [';', '\t', ','];
+  const delimiter = candidates.sort((a, b) => parseCsvRow(lines[0], b).length - parseCsvRow(lines[0], a).length)[0];
+  const headers = parseCsvRow(lines[0], delimiter);
+  if (headers.length < 2) throw new Error('Erwartet werden eine Zeitspalte und mindestens eine Wertespalte');
+  const columns = headers.slice(1).map((header, index) => {
+    const match = String(header || `CSV ${index + 1}`).match(/^(.*?)(?:\s*[\[(]([^\]\)]+)[\]\)])?$/);
+    return { name: (match?.[1] || `CSV ${index + 1}`).trim(), unit: (match?.[2] || '').trim(), values: [] };
+  });
+  for (const line of lines.slice(1)) {
+    const cells = parseCsvRow(line, delimiter);
+    const ts = parseCsvTimestamp(cells[0]);
+    if (!Number.isFinite(ts)) continue;
+    columns.forEach((column, index) => {
+      const raw = String(cells[index + 1] || '').trim();
+      const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+      const val = Number(normalized);
+      if (Number.isFinite(val)) column.values.push({ ts, val });
+    });
+  }
+  const imported = columns.filter(column => column.values.length).map((column, index) => ({
+    id: `csv:${file.name}:${index}:${uid()}`,
+    name: column.name,
+    unit: column.unit,
+    color: trendColor(state.trendSeries.length + index),
+    sourceType: 'csv',
+    sourceName: file.name,
+    csvValues: column.values.sort((a, b) => a.ts - b.ts)
+  }));
+  if (!imported.length) throw new Error('In der CSV-Datei wurden keine gültigen Zahlen mit Zeitstempel gefunden');
+  state.trendSeries.push(...imported);
+  const timestamps = imported.flatMap(series => series.csvValues.map(point => point.ts));
+  $('#trendStart').value = dateTimeValue(Math.min(...timestamps));
+  $('#trendEnd').value = dateTimeValue(Math.max(...timestamps));
+  $('#trendPeriod').value = 'custom';
+  state.trendZoomHistory = [];
+  await loadTrend();
+  toast(`${imported.length} CSV-Zeitreihe${imported.length === 1 ? '' : 'n'} importiert`);
+}
+
+function csvCell(value) {
+  const text = String(value ?? '');
+  return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function exportTrendCsv() {
+  if (!state.trendData.length) return toast('Keine Trendwerte zum Exportieren', true);
+  const rows = [['Zeitstempel', 'ISO-Zeit', 'Datenpunkt', 'Klartextname', 'Wert', 'Einheit', 'Quelle']];
+  state.trendData.forEach(dataset => dataset.values.forEach(point => rows.push([
+    point.ts,
+    new Date(point.ts).toISOString(),
+    dataset.id,
+    dataset.name || dataset.id,
+    String(point.val).replace('.', ','),
+    dataset.unit || '',
+    dataset.sourceType === 'csv' ? dataset.sourceName || 'CSV' : $('#trendSource').value
+  ])));
+  const content = `\uFEFF${rows.map(row => row.map(csvCell).join(';')).join('\r\n')}`;
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob), link = document.createElement('a');
+  const name = (state.bootstrap?.settings?.siteName || 'IOT-GLT').replace(/[^a-z0-9_-]+/gi, '-');
+  link.href = url;
+  link.download = `${new Date().toISOString().slice(0, 10)}-Trend-${name}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
 async function loadTrend() {
   try {
     if (!state.trendSeries.length) throw new Error('Bitte mindestens einen Datenpunkt hinzufügen');
     const source = $('#trendSource').value;
-    if (!source) throw new Error('Keine History- oder InfluxDB-Instanz konfiguriert');
+    if (!source && state.trendSeries.some(series => series.sourceType !== 'csv')) throw new Error('Keine History- oder InfluxDB-Instanz konfiguriert');
     const start = new Date($('#trendStart').value).getTime(), end = new Date($('#trendEnd').value).getTime();
     const resolution = Number($('#trendResolution').value) || 0;
-    const results = await Promise.all(state.trendSeries.map(series => api(`/api/history?id=${encodeURIComponent(series.id)}&source=${encodeURIComponent(source)}&start=${start}&end=${end}&resolution=${resolution}&count=${resolution ? 5000 : 10000}`)));
+    const results = await Promise.all(state.trendSeries.map(series => series.sourceType === 'csv'
+      ? Promise.resolve({ values: series.csvValues.filter(point => point.ts >= start && point.ts <= end) })
+      : api(`/api/history?id=${encodeURIComponent(series.id)}&source=${encodeURIComponent(source)}&start=${start}&end=${end}&resolution=${resolution}&count=${resolution ? 5000 : 10000}`)));
     state.trendData = results.map((result,index) => ({ ...state.trendSeries[index], values: result.values.filter(item => Number.isFinite(Number(item.val))).map(item => ({ ts: Number(item.ts), val: Number(item.val) })) }));
     renderCurrentTrend();
   } catch (error) { toast(error.message, true); }
@@ -794,9 +947,10 @@ async function showTrendStatePicker() {
     title: 'ioBroker-Objektbaum · Trenddatenpunkte',
     numericOnly: true,
     multiple: true,
-    selected: state.trendSeries,
+    selected: state.trendSeries.filter(series => series.sourceType !== 'csv'),
     onApply: rows => {
-      state.trendSeries = rows.map((row, index) => ({ ...row, color: state.trendSeries.find(item => item.id === row.id)?.color || trendColor(index) }));
+      const csvSeries = state.trendSeries.filter(series => series.sourceType === 'csv');
+      state.trendSeries = [...rows.map((row, index) => ({ ...row, color: state.trendSeries.find(item => item.id === row.id)?.color || trendColor(index) })), ...csvSeries];
       renderTrendLegend();
       if (state.trendSeries.length) loadTrend();
     }
@@ -1039,13 +1193,18 @@ function showUserDialog(user = null, options = {}) {
   const permissions = person.permissions || Object.fromEntries(modules.map(module => [module, { read: ['dashboard','alarms','visualization','trends','energy'].includes(module), write: false }]));
   const allowedNavigation = Array.isArray(person.allowedNavigationIds) ? new Set(person.allowedNavigationIds) : new Set(state.navigationTree.map(node => node.id));
   const plantPermissions = `<div class="wide"><strong>Sichtbare Anlagenbilder und Ebenen</strong><p class="muted">Nicht ausgewählte Einträge werden für diesen Benutzer vollständig aus dem Anlagenbaum ausgeblendet.</p><div class="plantPermissionList">${state.navigationTree.map(node => `<label style="padding-left:${8 + Math.max(0, (() => { let depth = 0, parent = node.parentId; while (parent && depth < 12) { depth += 1; parent = state.navigationTree.find(item => item.id === parent)?.parentId || ''; } return depth; })()) * 12}px"><input type="checkbox" data-plant-permission value="${escapeHtml(node.id)}" ${allowedNavigation.has(node.id) ? 'checked' : ''}>${treeIconSvg(node.icon)}<span>${escapeHtml(node.label)}</span></label>`).join('')}</div></div>`;
-  const body = `<div class="personForm"><label>Personenname<input id="displayName" value="${escapeHtml(person.displayName || '')}"></label><label>Benutzername<input id="userName" value="${escapeHtml(person.username || '')}" ${editing ? 'disabled' : ''}></label><label>Funktion / Rolle<input id="jobTitle" value="${escapeHtml(person.jobTitle || (person.role === 'admin' ? 'Administrator' : 'Beobachter'))}"></label><label>Zugriffsebene<select id="userRole"><option value="viewer">Benutzer</option><option value="admin" ${person.role === 'admin' ? 'selected' : ''}>Administrator</option></select></label><label>Bereich / Abteilung<input id="userDepartment" value="${escapeHtml(person.department || '')}"></label><label>E-Mail<input id="userEmail" type="email" value="${escapeHtml(person.email || '')}"></label><label>Telefon<input id="userPhone" type="tel" value="${escapeHtml(person.phone || '')}"></label><label>${editing ? 'Temporäres neues Passwort (leer = unverändert)' : 'Temporäres Passwort (mindestens 10 Zeichen)'}<input id="userPassword" type="password" autocomplete="new-password"></label><label class="wide checkLabel"><input id="forcePasswordChange" type="checkbox" ${!editing || person.mustChangePassword ? 'checked' : ''}> Bei der nächsten Anmeldung ein neues Passwort verlangen</label>${person.locked ? `<div class="accountLocked wide"><strong>Konto nach ${Number(person.failedLoginAttempts) || 7} Fehlversuchen gesperrt</strong><span>${person.lockedAt ? new Date(person.lockedAt).toLocaleString('de-DE') : ''}</span></div>` : ''}<label class="wide">Zusatzinformationen<textarea id="userNotes">${escapeHtml(person.notes || '')}</textarea></label>${plantPermissions}<div class="permissionGrid wide"><strong>Modul</strong><strong>Lesen</strong><strong>Schreiben</strong>${modules.map(module => `<span>${module}</span><input type="checkbox" data-perm="${module}" data-action="read" ${permissions[module]?.read ? 'checked' : ''}><input type="checkbox" data-perm="${module}" data-action="write" ${permissions[module]?.write ? 'checked' : ''}>`).join('')}</div><p class="muted wide">„User & Rechte“ und „Einstellungen“ sind ausschließlich für Administratoren verfügbar.</p></div>`;
+  const body = `<div class="personForm"><label>Personenname<input id="displayName" value="${escapeHtml(person.displayName || '')}"></label><label>Benutzername<input id="userName" value="${escapeHtml(person.username || '')}" ${editing ? 'disabled' : ''}></label><label>Funktion / Rolle<input id="jobTitle" value="${escapeHtml(person.jobTitle || (person.role === 'admin' ? 'Administrator' : 'Beobachter'))}"></label><label>Zugriffsebene<select id="userRole"><option value="viewer">Benutzer</option><option value="admin" ${person.role === 'admin' ? 'selected' : ''}>Administrator</option></select></label><label>Bereich / Abteilung<input id="userDepartment" value="${escapeHtml(person.department || '')}"></label><label>E-Mail<input id="userEmail" type="email" value="${escapeHtml(person.email || '')}"></label><label>Telefon<input id="userPhone" type="tel" value="${escapeHtml(person.phone || '')}"></label><label>${editing ? 'Temporäres neues Passwort (leer = unverändert)' : 'Temporäres Passwort (mindestens 10 Zeichen)'}<div class="passwordResetField"><input id="userPassword" type="password" autocomplete="new-password"><button id="toggleUserPassword" type="button" class="quiet">Anzeigen</button></div><small>Das bestehende Passwort ist durch den sicheren Hash nicht auslesbar. Hier kann ein temporäres neues Passwort gesetzt werden.</small></label><label class="wide checkLabel"><input id="forcePasswordChange" type="checkbox" ${!editing || person.mustChangePassword ? 'checked' : ''}> Bei der nächsten Anmeldung ein neues Passwort verlangen</label>${person.locked ? `<div class="accountLocked wide"><strong>Konto nach ${Number(person.failedLoginAttempts) || 7} Fehlversuchen gesperrt</strong><span>${person.lockedAt ? new Date(person.lockedAt).toLocaleString('de-DE') : ''}</span></div>` : ''}<label class="wide">Zusatzinformationen<textarea id="userNotes">${escapeHtml(person.notes || '')}</textarea></label>${plantPermissions}<div class="permissionGrid wide"><strong>Modul</strong><strong>Lesen</strong><strong>Schreiben</strong>${modules.map(module => `<span>${module}</span><input type="checkbox" data-perm="${module}" data-action="read" ${permissions[module]?.read ? 'checked' : ''}><input type="checkbox" data-perm="${module}" data-action="write" ${permissions[module]?.write ? 'checked' : ''}>`).join('')}</div><p class="muted wide">„User & Rechte“ und „Einstellungen“ sind ausschließlich für Administratoren verfügbar.</p></div>`;
   const save = async (unlock = false) => { try { const updatedPermissions = {}; $$('[data-perm]').forEach(input => { updatedPermissions[input.dataset.perm] ||= {}; updatedPermissions[input.dataset.perm][input.dataset.action] = input.checked; }); const allowedNavigationIds = $$('[data-plant-permission]:checked').map(input => input.value); await api('/api/users', { method: 'PUT', body: { id: editing ? user.id : undefined, username: $('#userName').value, displayName: $('#displayName').value, password: $('#userPassword').value, forcePasswordChange: $('#forcePasswordChange').checked, unlock, role: $('#userRole').value, jobTitle: $('#jobTitle').value, department: $('#userDepartment').value, email: $('#userEmail').value, phone: $('#userPhone').value, notes: $('#userNotes').value, permissions: updatedPermissions, allowedNavigationIds } }); closeModal(); await loadUsers(); toast(unlock ? 'Benutzerkonto entsperrt' : copying ? 'Person kopiert und gespeichert' : 'Person gespeichert'); } catch (error) { toast(error.message, true); } };
   const actions = [{ label: 'Abbrechen', click: closeModal }];
   if (editing) actions.push({ label: 'Person kopieren', click: () => showUserDialog(user, { copy: true }) });
   if (editing && person.locked) actions.push({ label: 'Konto entsperren', click: () => save(true) });
   actions.push({ label: copying ? 'Kopie speichern' : 'Speichern', primary: true, click: () => save(false) });
   modal(copying ? 'Person kopieren' : editing ? 'Person bearbeiten' : 'Person anlegen', body, actions);
+  $('#toggleUserPassword').addEventListener('click', event => {
+    const input = $('#userPassword'), reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    event.currentTarget.textContent = reveal ? 'Verbergen' : 'Anzeigen';
+  });
   $$('[data-perm][data-action="write"]').forEach(input => input.addEventListener('change', () => {
     if (input.checked) $(`[data-perm="${input.dataset.perm}"][data-action="read"]`).checked = true;
   }));
@@ -1122,16 +1281,24 @@ $('#addAlarm').addEventListener('click', showAddAlarm);
 $('#loadTrend').addEventListener('click', loadTrend);
 $('#addTrendStates').addEventListener('click', () => showTrendStatePicker().catch(error => toast(error.message,true)));
 $('#trendType').addEventListener('change', renderCurrentTrend);
+$('#trendLineWidth').addEventListener('input', renderCurrentTrend);
 $('#trendResolution').addEventListener('change', () => state.trendSeries.length && loadTrend());
 $('#trendMin').addEventListener('input', renderCurrentTrend);
 $('#trendMax').addEventListener('input', renderCurrentTrend);
 $('#trendSource').addEventListener('change', () => state.trendSeries.length && loadTrend());
 $('#trendPeriod').addEventListener('change', event => { if (event.target.value === 'custom') return; const end = Date.now(); $('#trendEnd').value = dateTimeValue(end); $('#trendStart').value = dateTimeValue(end-Number(event.target.value)*3600000); if (state.trendSeries.length) loadTrend(); });
 $('#trendLegend').addEventListener('click', event => { const colorButton = event.target.closest('[data-open-trend-colors]'); if (colorButton) return openTrendColorPalette(colorButton.dataset.openTrendColors,colorButton); const button = event.target.closest('[data-remove-trend]'); if (!button) return; state.trendSeries = state.trendSeries.filter(item => item.id !== button.dataset.removeTrend); state.trendData = state.trendData.filter(item => item.id !== button.dataset.removeTrend); renderCurrentTrend(); });
-$('#trendLegend').addEventListener('pointermove', event => { const item = event.target.closest('[data-trend-info]'); if (!item) return; const series = state.trendSeries.find(entry => entry.id === item.dataset.trendInfo), dataset = state.trendData.find(entry => entry.id === item.dataset.trendInfo), latest = dataset?.values?.at(-1); if (!series) return; const tooltip = $('#tooltip'); tooltip.innerHTML = `<strong>${escapeHtml(series.name || series.id)}</strong><br>DP-Adresse: ${escapeHtml(series.id)}<br>Einheit: ${escapeHtml(series.unit || '—')}<br>Quelle: ${escapeHtml($('#trendSource').value || '—')}<br>Auflösung: ${escapeHtml($('#trendResolution').selectedOptions[0].textContent)}${latest ? `<br>Letzter Wert: ${number(latest.val,4)} ${escapeHtml(series.unit || '')}<br>${new Date(latest.ts).toLocaleString('de-DE')}` : ''}`; tooltip.style.left = `${event.clientX+12}px`; tooltip.style.top = `${event.clientY+12}px`; tooltip.style.display = 'block'; });
+$('#trendLegend').addEventListener('pointermove', event => { const item = event.target.closest('[data-trend-info]'); if (!item) return; const series = state.trendSeries.find(entry => entry.id === item.dataset.trendInfo), dataset = state.trendData.find(entry => entry.id === item.dataset.trendInfo), latest = dataset?.values?.at(-1); if (!series) return; const tooltip = $('#tooltip'); tooltip.innerHTML = `<strong>${escapeHtml(series.name || series.id)}</strong><br>DP-Adresse: ${escapeHtml(series.id)}<br>Einheit: ${escapeHtml(series.unit || '—')}<br>Quelle: ${escapeHtml(series.sourceType === 'csv' ? series.sourceName || 'CSV' : $('#trendSource').value || '—')}<br>Auflösung: ${escapeHtml(series.sourceType === 'csv' ? 'CSV-Import' : $('#trendResolution').selectedOptions[0].textContent)}${latest ? `<br>Letzter Wert: ${number(latest.val,4)} ${escapeHtml(series.unit || '')}<br>${new Date(latest.ts).toLocaleString('de-DE')}` : ''}`; showTooltipAt(tooltip, event.clientX, event.clientY); });
 $('#trendLegend').addEventListener('pointerleave', () => $('#tooltip').style.display = 'none');
 $('#trendColorPalette').addEventListener('click', event => { const button = event.target.closest('[data-palette-color]'); if (!button) return; const id = $('#trendColorPalette').dataset.seriesId, color = button.dataset.paletteColor, series = state.trendSeries.find(item => item.id === id); if (series) series.color = color; state.trendData = state.trendData.map(dataset => dataset.id === id ? { ...dataset, color } : dataset); $('#trendColorPalette').hidden = true; renderCurrentTrend(); });
 $('#exportTrendPdf').addEventListener('click', exportTrendPdf);
+$('#exportTrendCsv').addEventListener('click', exportTrendCsv);
+$('#importTrendCsv').addEventListener('click', () => $('#trendCsvInput').click());
+$('#trendCsvInput').addEventListener('change', event => {
+  const file = event.target.files?.[0];
+  importTrendCsv(file).catch(error => toast(error.message, true)).finally(() => { event.target.value = ''; });
+});
+$('#trendZoomBack').addEventListener('click', () => restorePreviousTrendZoom().catch(error => toast(error.message, true)));
 $('#dashboardEdit').addEventListener('click', event => { state.dashboardEdit=!state.dashboardEdit; event.currentTarget.textContent=state.dashboardEdit?'Bearbeitung beenden':'Bearbeiten'; event.currentTarget.setAttribute('aria-pressed',String(state.dashboardEdit)); $('#dashboardAdd').hidden=!state.dashboardEdit; renderDashboard(); });
 $('#dashboardAdd').addEventListener('click', () => showDashboardDialog());
 $('#dashboardRefresh').addEventListener('click', refreshDashboard);
@@ -1144,9 +1311,9 @@ $('#settingsFont').addEventListener('change', event => applyFont(event.target.va
 $('#settingsTheme').addEventListener('change', event => applyTheme(event.target.value));
 $('#saveUiSettings').addEventListener('click', async () => { try { const rawAdminUrl = $('#settingsIoBrokerUrl').value.trim(), ioBrokerAdminUrl = rawAdminUrl ? safeVisUrl(rawAdminUrl) : ''; if (rawAdminUrl && !ioBrokerAdminUrl) throw new Error('Bitte eine gültige ioBroker-Adresse eingeben'); const settings = await api('/api/settings', { method: 'PUT', body: { siteName: $('#settingsSiteName').value, fontFamily: $('#settingsFont').value, theme: $('#settingsTheme').value, autoLogoffMinutes: Number($('#settingsAutoLogoff').value), ioBrokerAdminUrl } }); state.bootstrap.settings = settings; $('#settingsIoBrokerUrl').value = settings.ioBrokerAdminUrl || ''; $('#headerSiteName').textContent = settings.siteName; applyFont(settings.fontFamily); applyTheme(settings.theme); resetAutoLogout(); toast('Oberflächeneinstellungen gespeichert'); } catch (error) { toast(error.message,true); } });
 $('#managePlantTree').addEventListener('click', () => showTreeNodeDialog());
-$('#togglePlantTree').addEventListener('click', event => { const layout = $('.visualizationLayout'), collapsed = !layout.classList.contains('tree-collapsed'); layout.classList.toggle('tree-collapsed', collapsed); event.currentTarget.setAttribute('aria-expanded', String(!collapsed)); event.currentTarget.textContent = collapsed ? 'Anlagenbaum ausklappen' : 'Anlagenbaum einklappen'; });
-$('#toggleTrendSettings').addEventListener('click', event => toggleSettingsPanel(event.currentTarget, $('#trendSettings'), $('#view-trends'), 'settings-collapsed'));
-$('#toggleEnergySettings').addEventListener('click', event => toggleSettingsPanel(event.currentTarget, $('#energySettings'), $('#view-energy'), 'energy-settings-collapsed'));
+$('#togglePlantTree').addEventListener('click', event => { const layout = $('.visualizationLayout'), collapsed = !layout.classList.contains('tree-collapsed'); layout.classList.toggle('tree-collapsed', collapsed); event.currentTarget.setAttribute('aria-expanded', String(!collapsed)); event.currentTarget.setAttribute('aria-label', collapsed ? 'Anlagenbaum einblenden' : 'Anlagenbaum ausblenden'); });
+$('#toggleTrendSettings').addEventListener('click', event => toggleSettingsPanel(event.currentTarget, $('#trendControls'), $('#view-trends'), 'settings-collapsed'));
+$('#toggleEnergySettings').addEventListener('click', event => toggleSettingsPanel(event.currentTarget, $('#energyControls'), $('#view-energy'), 'energy-settings-collapsed'));
 $('#userSearch').addEventListener('input', event => { state.userSearch = event.target.value; renderUsers(); });
 $$('[data-user-sort]').forEach(header => header.addEventListener('click', () => { const key = header.dataset.userSort; state.userSort = { key, direction: state.userSort.key === key ? -state.userSort.direction : 1 }; renderUsers(); }));
 $('#modal').addEventListener('click', event => { if (event.target === $('#modal')) closeModal(); });

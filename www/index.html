@@ -26,7 +26,7 @@
       <button data-view="energy" aria-label="Energiemanagement"><svg class="navIcon" viewBox="0 0 24 24"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z"/></svg><span class="navLabel">Energiemanagement</span></button>
       <button data-view="iobroker" aria-label="ioBroker Administration"><svg class="navIcon" viewBox="0 0 24 24"><path d="M5 5h14v14H5z"/><path d="M8 9h8m-8 3h5m-5 3h7"/></svg><span class="navLabel">ioBroker Administration</span></button>
       <button data-view="users" aria-label="User und Rechte"><svg class="navIcon" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6.5 16c.7-2 4.3-2 5 0M14 10h3m-3 4h3"/></svg><span class="navLabel">User &amp; Rechte</span></button>
-      <button data-view="settings" aria-label="Einstellungen"><svg class="navIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/></svg><span class="navLabel">Einstellungen</span></button>
+      <button data-view="settings" aria-label="Einstellungen"><svg class="navIcon" viewBox="0 0 24 24"><path d="M9.6 3.1 10.2 1h3.6l.6 2.1 1.8.8 2-1.1 2.5 2.5-1.1 2 .8 1.8 2.1.6v3.6l-2.1.6-.8 1.8 1.1 2-2.5 2.5-2-1.1-1.8.8-.6 2.1h-3.6l-.6-2.1-1.8-.8-2 1.1-2.5-2.5 1.1-2-.8-1.8-2.1-.6V9.7l2.1-.6.8-1.8-1.1-2 2.5-2.5 2 1.1 1.8-.8Z"/><circle cx="12" cy="11.5" r="3"/></svg><span class="navLabel">Einstellungen</span></button>
     </nav>
     <footer><div class="sidebarIdentity"><strong id="sideUser">Gast</strong><small id="sideRole">Nur lesen</small></div><small id="sideVersion" class="sideVersion">0.0.0</small></footer>
   </aside>
@@ -40,7 +40,7 @@
     </section>
 
     <section id="view-visualization" class="view">
-      <div class="viewHead"><div><p class="eyebrow">LIVE-ANLAGENBILDER</p><h1>Visualisierung</h1></div><div class="actions"><button id="togglePlantTree" class="quiet" aria-expanded="true">Anlagenbaum einklappen</button><a id="openVisExternal" class="quiet buttonLink" href="#" target="_blank" rel="noopener" hidden>Ansicht extern öffnen</a></div></div>
+      <div class="viewHead"><div><p class="eyebrow">LIVE-ANLAGENBILDER</p><h1>Visualisierung</h1></div><div class="actions"><button id="togglePlantTree" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Anlagenbaum ein- oder ausklappen" title="Anlagenbaum ein- oder ausklappen"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button><a id="openVisExternal" class="quiet buttonLink" href="#" target="_blank" rel="noopener" hidden>Ansicht extern öffnen</a></div></div>
       <div class="visualizationLayout">
         <aside class="plantTreePanel panel"><div class="panelHead"><h2>Anlagenbaum</h2></div><div id="plantTree" class="plantTree"></div></aside>
         <section class="visFramePanel panel"><div class="visFrameHead"><h2 id="visFrameTitle">Anlagenansicht</h2></div><iframe id="visFrame" class="visFrame" title="ioBroker VIS Anlagenansicht" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-pointer-lock allow-presentation" referrerpolicy="strict-origin-when-cross-origin" hidden></iframe><div id="internalVisual" class="visualShell"><div id="liveCanvas" class="plantCanvas"></div></div><div id="visFrameEmpty" class="visFrameEmpty" hidden></div></section>
@@ -48,25 +48,26 @@
     </section>
 
     <section id="view-trends" class="view">
-      <div class="viewHead"><div><p class="eyebrow">ZEITREIHEN</p><h1>Trendkurven</h1></div><div class="actions"><button id="exportTrendPdf" class="quiet">PDF direkt herunterladen</button><button id="addTrendStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadTrend" class="primary">Aktualisieren</button></div></div>
-      <button id="toggleTrendSettings" class="sectionToggle quiet" aria-expanded="true">Einstellungen einklappen</button>
-      <div id="trendSettings" class="filterBar trendFilters collapsibleSettings">
+      <div class="viewHead"><div><p class="eyebrow">ZEITREIHEN</p><h1>Trendkurven</h1></div><button id="toggleTrendSettings" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Trendwerkzeuge ein- oder ausblenden" title="Trendwerkzeuge ein- oder ausblenden"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button></div>
+      <div id="trendControls" class="trendControls collapsibleSettings">
+        <div class="actions trendActions"><button id="importTrendCsv" class="quiet">CSV importieren</button><input id="trendCsvInput" type="file" accept=".csv,text/csv" hidden><button id="exportTrendCsv" class="quiet">CSV exportieren</button><button id="exportTrendPdf" class="quiet">PDF direkt herunterladen</button><button id="addTrendStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadTrend" class="primary">Aktualisieren</button></div>
+        <div id="trendSettings" class="filterBar trendFilters">
         <label>Datenbank<select id="trendSource"></select></label><label>Zeitskalierung<select id="trendPeriod"><option value="1">1 Stunde</option><option value="6">6 Stunden</option><option value="24" selected>24 Stunden</option><option value="168">7 Tage</option><option value="custom">Benutzerdefiniert</option></select></label>
         <label>Von<input id="trendStart" type="datetime-local"></label><label>Bis<input id="trendEnd" type="datetime-local"></label>
-        <label>Darstellung<select id="trendType"><option value="line">Linien</option><option value="step">Stufen</option><option value="bar">Balken</option><option value="pie">Tortendiagramm</option><option value="heat">Heatmap</option></select></label><label>Datengenauigkeit<select id="trendResolution"><option value="0">Rohdaten · höchste Auflösung</option><option value="1">1 Sekunde</option><option value="10">10 Sekunden · leicht geglättet</option><option value="60">1 Minute · Mittelwert</option><option value="300">5 Minuten · geglättet</option><option value="900">15 Minuten · stark geglättet</option><option value="3600">1 Stunde · Langzeittrend</option></select></label><label>Wert min<input id="trendMin" type="number" placeholder="Automatisch"></label><label>Wert max<input id="trendMax" type="number" placeholder="Automatisch"></label><label>Aktualisierung<select id="trendLive"><option value="live">Live · 15 Sekunden</option><option value="manual">Manuell</option></select></label>
+        <label>Darstellung<select id="trendType"><option value="line">Linien</option><option value="step">Stufen</option><option value="bar">Balken</option><option value="pie">Tortendiagramm</option><option value="heat">Heatmap</option></select></label><label>Linienstärke (px)<input id="trendLineWidth" type="number" min="0.5" max="12" step="0.5" value="2.5"></label><label>Datengenauigkeit<select id="trendResolution"><option value="0">Rohdaten · höchste Auflösung</option><option value="1">1 Sekunde</option><option value="10">10 Sekunden · leicht geglättet</option><option value="60">1 Minute · Mittelwert</option><option value="300">5 Minuten · geglättet</option><option value="900">15 Minuten · stark geglättet</option><option value="3600">1 Stunde · Langzeittrend</option></select></label><label>Wert min<input id="trendMin" type="number" placeholder="Automatisch"></label><label>Wert max<input id="trendMax" type="number" placeholder="Automatisch"></label><label>Aktualisierung<select id="trendLive"><option value="live">Live · 15 Sekunden</option><option value="manual">Manuell</option></select></label>
+        </div>
       </div>
-      <div class="panel chartPanel"><div id="trendChart" class="chart"><div class="empty">Über „Datenpunkte hinzufügen“ mehrere Zeitreihen auswählen.</div></div><div id="trendLegend" class="trendLegend"></div></div>
+      <div class="panel chartPanel"><button id="trendZoomBack" class="quiet zoomBack" aria-label="Vorherige Skalierung wiederherstellen" title="Vorherige Skalierung" hidden>↶</button><div id="trendChart" class="chart"><div class="empty">Über „Datenpunkte hinzufügen“ mehrere Zeitreihen auswählen.</div></div><div id="trendLegend" class="trendLegend"></div></div>
     </section>
 
-    <section id="view-iobroker" class="view">
-      <div class="viewHead"><div><p class="eyebrow">ADMINISTRATION</p><h1>ioBroker</h1><p class="muted">Direkter Zugriff auf die ioBroker-Administrationsoberfläche.</p></div><a id="openIoBrokerExternal" class="quiet buttonLink" href="#" target="_blank" rel="noopener">Extern öffnen</a></div>
-      <section class="panel ioBrokerPanel"><iframe id="ioBrokerFrame" title="ioBroker Administration" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"></iframe></section>
+    <section id="view-iobroker" class="view ioBrokerWorkspace">
+      <section class="panel ioBrokerPanel"><div class="ioBrokerPanelToolbar"><a id="openIoBrokerExternal" class="quiet buttonLink" href="#" target="_blank" rel="noopener">Extern öffnen</a></div><iframe id="ioBrokerFrame" title="ioBroker Administration" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-downloads"></iframe></section>
     </section>
 
     <section id="view-energy" class="view">
-      <div class="viewHead"><div><p class="eyebrow">VERBRAUCH · KOSTEN · CO₂</p><h1>Energiemanagement</h1></div><div class="actions"><button id="addEnergyStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadEnergyHistory" class="quiet">Historische Daten laden</button><button id="createReport" class="primary">Bericht berechnen</button></div></div>
-      <button id="toggleEnergySettings" class="sectionToggle quiet" aria-expanded="true">Einstellungen einklappen</button>
-      <div id="energySettings" class="filterBar energyFilters collapsibleSettings">
+      <div class="viewHead"><div><p class="eyebrow">VERBRAUCH · KOSTEN · CO₂</p><h1>Energiemanagement</h1></div><button id="toggleEnergySettings" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Energiewerkzeuge ein- oder ausblenden" title="Energiewerkzeuge ein- oder ausblenden"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button></div>
+      <div id="energyControls" class="energyControls collapsibleSettings"><div class="actions energyActions"><button id="addEnergyStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadEnergyHistory" class="quiet">Historische Daten laden</button><button id="createReport" class="primary">Bericht berechnen</button></div>
+      <div id="energySettings" class="filterBar energyFilters">
         <label>Datenbank<select id="energySource"></select></label>
         <label>Berichtsname<input id="reportName" value="Energieauswertung"></label>
         <label>Verbrauchsdatenpunkt<div class="objectInput"><input id="energyState" readonly placeholder="kWh-Zähler"><button id="pickEnergyState" type="button" class="quiet">Objekte</button></div></label>
@@ -74,7 +75,7 @@
         <label>Preis / kWh<input id="energyPrice" type="number" step="0.001" value="0.35"></label>
         <label>kg CO₂ / kWh<input id="energyCo2" type="number" step="0.001" value="0.38"></label>
         <label>Von<input id="energyStart" type="date"></label><label>Bis<input id="energyEnd" type="date"></label>
-      </div>
+      </div></div>
       <div class="panel energyHistoryPanel"><div id="energyHistoryChart" class="chart"><div class="empty">Datenpunkte hinzufügen und historische Daten laden.</div></div><div id="energyLegend" class="trendLegend"></div></div>
       <div id="reportCards" class="reportGrid"><div class="empty panel">Noch keine Berichte gespeichert.</div></div>
     </section>
@@ -91,7 +92,7 @@
 
     <section id="view-settings" class="view">
       <div class="viewHead"><div><p class="eyebrow">SYSTEM</p><h1>Einstellungen</h1></div><button id="saveUiSettings" class="primary">Einstellungen speichern</button></div>
-      <div class="panel settingsGrid"><label>Name der GLT<input id="settingsSiteName" maxlength="120" placeholder="Gebäude Zentrale"></label><label>Schriftart<select id="settingsFont"><option value="apple">Apple System</option><option value="material">Material / Roboto</option></select></label><label>Farbschema<select id="settingsTheme"><option value="light">Evreghen Hell</option><option value="dark">Darkmodus</option><option value="system">Systemeinstellung</option></select><small>Die aktuelle gut lesbare Schrift bleibt erhalten.</small></label><label>Automatischer Logoff nach Minuten<input id="settingsAutoLogoff" type="number" min="5" max="1440" step="5" value="30"><small>Die Zeit wird bei Benutzeraktivität neu gestartet.</small></label><label>ioBroker-Admin-Adresse<input id="settingsIoBrokerUrl" maxlength="2048" placeholder="192.168.178.101:8081"><small>Leer = aktueller Host mit Port 8081.</small></label></div>
+      <div class="panel settingsGrid"><label>Name der GLT<input id="settingsSiteName" maxlength="120" placeholder="Gebäude Zentrale"></label><label>Schriftart<select id="settingsFont"><option value="apple">Apple System</option><option value="material">Material / Roboto</option></select></label><label>Farbschema<select id="settingsTheme"><option value="light">Daymodus</option><option value="dark">Darkmodus</option><option value="system">Systemeinstellung</option></select><small>Die aktuelle gut lesbare Schrift bleibt erhalten.</small></label><label>Automatischer Logoff nach Minuten<input id="settingsAutoLogoff" type="number" min="5" max="1440" step="5" value="30"><small>Die Zeit wird bei Benutzeraktivität neu gestartet.</small></label><label>ioBroker-Admin-Adresse<input id="settingsIoBrokerUrl" maxlength="2048" placeholder="192.168.178.101:8081"><small>Leer = aktueller Host mit Port 8081.</small></label></div>
     </section>
   </main>
 
