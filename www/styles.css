@@ -83,8 +83,13 @@ html[data-theme="dark"] .colorPalette{background:#352f2a}
 :root{--sidebar-expanded:276px}
 .sidebar nav button[hidden],.sidebar nav button.permission-hidden{display:none!important}
 .sidebar nav{align-content:start;grid-auto-flow:row}
-.sidebar nav button{height:auto;min-height:42px;grid-template-columns:40px minmax(0,1fr);overflow:visible}
-.navLabel{overflow:visible;text-overflow:clip;white-space:normal;font-size:.79rem;font-weight:500;line-height:1.22}
+.sidebar nav button{height:48px;min-height:48px;max-height:48px;grid-template-columns:40px minmax(0,1fr);overflow:hidden}
+.navLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.1px;font-weight:400;line-height:1.15}
+.viewTitleControls{display:grid;justify-items:start;gap:4px}
+.viewTitleControls .hamburgerToggle{margin-top:5px}
+body:not(.menu-open) .sidebar nav button{width:52px;grid-template-columns:40px;overflow:hidden}
+body:not(.menu-open) .sidebar nav button.active{max-width:52px}
+body:not(.menu-open) .navLabel{display:none}
 .hamburgerToggle{display:grid!important;place-items:center;flex:0 0 42px;width:42px;height:40px;padding:0!important}
 .hamburgerToggleIcon{display:grid!important;gap:4px;width:18px;color:currentColor!important}
 .hamburgerToggleIcon i{display:block;width:18px;height:2px;border-radius:2px;background:currentColor}
@@ -95,6 +100,12 @@ html[data-theme="dark"] .colorPalette{background:#352f2a}
 .tooltip{z-index:1200;max-width:min(420px,calc(100vw - 24px));padding:10px 12px;border-color:#d1d5dc;background:#fff;color:#292524;font-size:.8rem;line-height:1.45;box-shadow:0 8px 24px #0003}
 html[data-theme="dark"] .tooltip{border-color:#756b62;background:#211d1a;color:#fafaf9}
 .colorPalette button[data-palette-color]{background-image:none!important;opacity:1!important;filter:none!important}
+.trendSwatch{display:block;width:22px;height:6px;border-radius:3px}
+.paletteColor0{background-color:#2f80ed!important}.paletteColor1{background-color:#56ccf2!important}.paletteColor2{background-color:#27ae60!important}.paletteColor3{background-color:#6fcf97!important}
+.paletteColor4{background-color:#f2994a!important}.paletteColor5{background-color:#f2c94c!important}.paletteColor6{background-color:#eb5757!important}.paletteColor7{background-color:#ff7a90!important}
+.paletteColor8{background-color:#9b51e0!important}.paletteColor9{background-color:#bb6bd9!important}.paletteColor10{background-color:#34495e!important}.paletteColor11{background-color:#7f8c8d!important}
+.paletteColor12{background-color:#00a8a8!important}.paletteColor13{background-color:#8d6e63!important}.paletteColor14{background-color:#c2185b!important}.paletteColor15{background-color:#5c6bc0!important}
+.donutHole{fill:var(--surface-elevated)}
 .pill.alarm{background:#b42318;color:#fff;font-weight:700}.pill.warning{background:#9a6700;color:#fff;font-weight:700}.pill.ok{background:#067647;color:#fff;font-weight:700}
 html[data-theme="dark"] .pill.alarm{background:#ff5a65;color:#180305}html[data-theme="dark"] .pill.warning{background:#f4c34d;color:#281b00}html[data-theme="dark"] .pill.ok{background:#39d98a;color:#062317}
 .passwordResetField{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}.passwordResetField .quiet{white-space:nowrap}.personForm label>small{margin-top:2px;color:var(--muted);line-height:1.35}

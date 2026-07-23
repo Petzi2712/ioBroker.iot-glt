@@ -2,7 +2,7 @@
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const state = { bootstrap: null, user: null, csrf: '', pages: [], navigationTree: [], selectedTreeId: '', expandedTreeIds: new Set(), currentView: 'dashboard', editorPage: 0, selectedWidget: null, stateCache: new Map(), reports: [], trendSeries: [], trendData: [], trendZoomHistory: [], trendWheelSession: 0, energySeries: [], energyData: [], users: [], userSearch: '', userSort: { key: 'displayName', direction: 1 }, autoLogoutTimer: null, lastKeepAlive: 0, treeDragActive: false, dashboardEdit: false, dashboardActiveId: null, dashboardWidgets: [] };
+const state = { bootstrap: null, user: null, csrf: '', pages: [], navigationTree: [], selectedTreeId: '', expandedTreeIds: new Set(), currentView: 'dashboard', editorPage: 0, selectedWidget: null, stateCache: new Map(), reports: [], trendSeries: [], trendData: [], trendZoomHistory: [], trendWheelSession: 0, energySeries: [], energyData: [], energyScrollTimer: null, users: [], userSearch: '', userSort: { key: 'displayName', direction: 1 }, autoLogoutTimer: null, lastKeepAlive: 0, treeDragActive: false, dashboardEdit: false, dashboardActiveId: null, dashboardWidgets: [] };
 const uid = () => globalThis.crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 function escapeHtml(value) {
@@ -635,6 +635,7 @@ function trendColor(index) {
 }
 
 const trendPalette = ['#2f80ed','#56ccf2','#27ae60','#6fcf97','#f2994a','#f2c94c','#eb5757','#ff7a90','#9b51e0','#bb6bd9','#34495e','#7f8c8d','#00a8a8','#8d6e63','#c2185b','#5c6bc0'];
+const trendColorClass = color => `paletteColor${Math.max(0, trendPalette.indexOf(String(color).toLowerCase()))}`;
 
 function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = null, rangeEnd = null, requestedLineWidth = 2.5) {
   const width = 1000, height = 350, top = 18, bottom = 42;
@@ -648,13 +649,20 @@ function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = 
   const x = timestamp => left + (timestamp - start) / timeSpan * (width - left - right);
   const scales = new Map(units.map((unit,index) => {
     const values = datasets.filter(dataset => (dataset.unit || 'Wert') === unit).flatMap(dataset => dataset.values.map(item => item.val));
+    if (type === 'stackedBar') {
+      const matching = datasets.filter(dataset => (dataset.unit || 'Wert') === unit);
+      const count = Math.min(100, Math.max(...matching.map(dataset => dataset.values.length)));
+      for (let pointIndex = 0; pointIndex < count; pointIndex += 1) {
+        values.push(matching.reduce((sum, dataset) => sum + Math.max(0, Number(dataset.values[Math.min(dataset.values.length - 1, Math.floor(pointIndex * dataset.values.length / Math.max(1, count)))]?.val) || 0), 0));
+      }
+    }
     const useManual = units.length === 1;
     const min = useManual && requestedMin !== '' ? Number(requestedMin) : Math.min(...values);
     const max = useManual && requestedMax !== '' ? Number(requestedMax) : Math.max(...values);
     return [unit, { unit, index, min, max, span: Math.max(.0001, max - min), side: index % 2 ? 'right' : 'left', lane: Math.floor(index / 2) }];
   }));
   const y = (value, unit) => { const scale = scales.get(unit || 'Wert'); return height - bottom - (value - scale.min) / scale.span * plotHeight; };
-  if (type === 'pie') {
+  if (type === 'pie' || type === 'donut') {
     const totals = datasets.map(dataset => Math.abs(dataset.values.reduce((sum, item) => sum + Number(item.val || 0), 0) / Math.max(1, dataset.values.length)));
     const sum = totals.reduce((total, value) => total + value, 0) || 1;
     let angle = -Math.PI / 2;
@@ -665,7 +673,8 @@ function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = 
       angle = next;
       return path;
     }).join('');
-    return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Tortendiagramm">${paths}</svg>`;
+    const hole = type === 'donut' ? '<circle class="donutHole" cx="500" cy="175" r="76"/>' : '';
+    return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${type === 'donut' ? 'Ring-Tortendiagramm' : 'Tortendiagramm'}">${paths}${hole}</svg>`;
   }
   if (type === 'heat') {
     const rowHeight = Math.min(44, plotHeight / Math.max(1,datasets.length)), cols = 48, cellWidth = (width-left-right) / cols;
@@ -689,7 +698,21 @@ function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = 
     return `<line class="axis" x1="${axisX}" y1="${top}" x2="${axisX}" y2="${height-bottom}"/>${ticks}<text class="axisUnit" text-anchor="middle" transform="rotate(${rotation} ${titleX} ${top+plotHeight/2})" x="${titleX}" y="${top+plotHeight/2}">${escapeHtml(scale.unit)}</text>`;
   }).join('');
   let marks = '';
-  datasets.forEach((dataset, datasetIndex) => {
+  if (type === 'stackedBar') {
+    const count = Math.min(100, Math.max(...datasets.map(dataset => dataset.values.length)));
+    const barWidth = Math.max(2, (width - left - right) / Math.max(1, count));
+    for (let index = 0; index < count; index += 1) {
+      let cumulative = 0;
+      datasets.forEach(dataset => {
+        const point = dataset.values[Math.min(dataset.values.length - 1, Math.floor(index * dataset.values.length / Math.max(1, count)))];
+        if (!point) return;
+        const unit = dataset.unit || 'Wert', from = y(cumulative, unit);
+        cumulative += Math.max(0, Number(point.val) || 0);
+        const to = y(cumulative, unit);
+        marks += `<rect x="${left + index * barWidth}" y="${Math.min(from, to)}" width="${Math.max(1, barWidth - 1)}" height="${Math.abs(from - to)}" fill="${dataset.color}"><title>${escapeHtml(dataset.name)} · ${number(point.val, 3)} ${escapeHtml(dataset.unit || '')}</title></rect>`;
+      });
+    }
+  } else datasets.forEach((dataset, datasetIndex) => {
     const unit = dataset.unit || 'Wert';
     if (type === 'bar') {
       const shown = dataset.values.slice(-120), barWidth = Math.max(2,(width-left-right)/Math.max(1,shown.length)/Math.max(1,datasets.length));
@@ -704,13 +727,13 @@ function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = 
 }
 
 function renderTrendLegend() {
-  $('#trendLegend').innerHTML = state.trendSeries.map(series => `<div class="trendLegendItem" data-trend-info="${escapeHtml(series.id)}"><button class="trendColorButton" style="--trend-color:${escapeHtml(series.color)}" data-open-trend-colors="${escapeHtml(series.id)}" aria-label="Farbe für ${escapeHtml(series.name || series.id)} ändern"><i style="background-color:${escapeHtml(series.color)}"></i></button><strong>${escapeHtml(series.name || series.id)}</strong><button class="quiet" data-remove-trend="${escapeHtml(series.id)}">Entfernen</button></div>`).join('');
+  $('#trendLegend').innerHTML = state.trendSeries.map(series => `<div class="trendLegendItem" data-trend-info="${escapeHtml(series.id)}"><button class="trendColorButton" data-open-trend-colors="${escapeHtml(series.id)}" aria-label="Farbe für ${escapeHtml(series.name || series.id)} ändern"><i class="trendSwatch ${trendColorClass(series.color)}"></i></button><strong>${escapeHtml(series.name || series.id)}</strong><button class="quiet" data-remove-trend="${escapeHtml(series.id)}">Entfernen</button></div>`).join('');
 }
 
 function openTrendColorPalette(seriesId, anchor) {
   const palette = $('#trendColorPalette'), rect = anchor.getBoundingClientRect();
   palette.dataset.seriesId = seriesId;
-  palette.innerHTML = trendPalette.map(color => `<button type="button" style="--palette-color:${color};background:${color}!important;background-color:${color}!important" data-palette-color="${color}" aria-label="Farbe ${color}"></button>`).join('');
+  palette.innerHTML = trendPalette.map((color, index) => `<button type="button" class="paletteColor${index}" data-palette-color="${color}" aria-label="Farbe ${color}"></button>`).join('');
   palette.hidden = false;
   const paletteRect = palette.getBoundingClientRect();
   palette.style.left = `${Math.max(8, Math.min(innerWidth - paletteRect.width - 8, rect.left))}px`;
@@ -855,7 +878,7 @@ function parseCsvTimestamp(value) {
   return Date.parse(raw);
 }
 
-async function importTrendCsv(file) {
+async function parseCsvSeries(file, existingCount = 0) {
   if (!file) return;
   if (file.size > 15 * 1024 * 1024) throw new Error('Die CSV-Datei darf maximal 15 MB groß sein');
   const text = (await file.text()).replace(/^\uFEFF/, '');
@@ -865,6 +888,38 @@ async function importTrendCsv(file) {
   const delimiter = candidates.sort((a, b) => parseCsvRow(lines[0], b).length - parseCsvRow(lines[0], a).length)[0];
   const headers = parseCsvRow(lines[0], delimiter);
   if (headers.length < 2) throw new Error('Erwartet werden eine Zeitspalte und mindestens eine Wertespalte');
+  const normalizedHeaders = headers.map(header => String(header).trim().toLowerCase());
+  if (normalizedHeaders[0] === 'datum' && normalizedHeaders[1] === 'uhrzeit' && normalizedHeaders[2]?.includes('datenpunkt')) {
+    const firstCells = parseCsvRow(lines[1], delimiter);
+    const names = String(firstCells[2] || '').split('|').map(name => name.trim()).filter(Boolean);
+    const wideColumns = [];
+    for (let columnIndex = 3, seriesIndex = 0; columnIndex < headers.length; columnIndex += 2, seriesIndex += 1) {
+      wideColumns.push({ name: names[seriesIndex] || `CSV ${seriesIndex + 1}`, unit: '', values: [] });
+    }
+    for (const line of lines.slice(1)) {
+      const cells = parseCsvRow(line, delimiter);
+      const ts = parseCsvTimestamp(`${cells[0]} ${cells[1]}`);
+      if (!Number.isFinite(ts)) continue;
+      wideColumns.forEach((column, index) => {
+        const raw = String(cells[3 + index * 2] || '').trim();
+        const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+        const val = Number(normalized);
+        column.unit ||= String(cells[4 + index * 2] || '').trim();
+        if (raw !== '' && Number.isFinite(val)) column.values.push({ ts, val });
+      });
+    }
+    const imported = wideColumns.filter(column => column.values.length).map((column, index) => ({
+      id: `csv:${file.name}:${index}:${uid()}`,
+      name: column.name,
+      unit: column.unit,
+      color: trendColor(existingCount + index),
+      sourceType: 'csv',
+      sourceName: file.name,
+      csvValues: column.values.sort((a, b) => a.ts - b.ts)
+    }));
+    if (!imported.length) throw new Error('In der CSV-Datei wurden keine gültigen Zahlen mit Zeitstempel gefunden');
+    return imported;
+  }
   const columns = headers.slice(1).map((header, index) => {
     const match = String(header || `CSV ${index + 1}`).match(/^(.*?)(?:\s*[\[(]([^\]\)]+)[\]\)])?$/);
     return { name: (match?.[1] || `CSV ${index + 1}`).trim(), unit: (match?.[2] || '').trim(), values: [] };
@@ -884,12 +939,18 @@ async function importTrendCsv(file) {
     id: `csv:${file.name}:${index}:${uid()}`,
     name: column.name,
     unit: column.unit,
-    color: trendColor(state.trendSeries.length + index),
+    color: trendColor(existingCount + index),
     sourceType: 'csv',
     sourceName: file.name,
     csvValues: column.values.sort((a, b) => a.ts - b.ts)
   }));
   if (!imported.length) throw new Error('In der CSV-Datei wurden keine gültigen Zahlen mit Zeitstempel gefunden');
+  return imported;
+}
+
+async function importTrendCsv(file) {
+  const imported = await parseCsvSeries(file, state.trendSeries.length);
+  if (!imported) return;
   state.trendSeries.push(...imported);
   const timestamps = imported.flatMap(series => series.csvValues.map(point => point.ts));
   $('#trendStart').value = dateTimeValue(Math.min(...timestamps));
@@ -905,26 +966,38 @@ function csvCell(value) {
   return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function exportTrendCsv() {
-  if (!state.trendData.length) return toast('Keine Trendwerte zum Exportieren', true);
-  const rows = [['Zeitstempel', 'ISO-Zeit', 'Datenpunkt', 'Klartextname', 'Wert', 'Einheit', 'Quelle']];
-  state.trendData.forEach(dataset => dataset.values.forEach(point => rows.push([
-    point.ts,
-    new Date(point.ts).toISOString(),
-    dataset.id,
-    dataset.name || dataset.id,
-    String(point.val).replace('.', ','),
-    dataset.unit || '',
-    dataset.sourceType === 'csv' ? dataset.sourceName || 'CSV' : $('#trendSource').value
-  ])));
-  const content = `\uFEFF${rows.map(row => row.map(csvCell).join(';')).join('\r\n')}`;
+function wideSeriesCsv(datasets) {
+  const timestamps = [...new Set(datasets.flatMap(dataset => dataset.values.map(point => Number(point.ts))))].filter(Number.isFinite).sort((a, b) => a - b);
+  const valueMaps = datasets.map(dataset => new Map(dataset.values.map(point => [Number(point.ts), point.val])));
+  const headers = ['Datum', 'Uhrzeit', 'Datenpunktname'];
+  datasets.forEach((dataset, index) => headers.push(`Wert ${index + 1}`, `Einheit Wert ${index + 1}`));
+  const names = datasets.map(dataset => dataset.name || dataset.id).join(' | ');
+  const rows = [headers, ...timestamps.map(timestamp => {
+    const date = new Date(timestamp);
+    const row = [date.toLocaleDateString('de-DE'), date.toLocaleTimeString('de-DE'), names];
+    datasets.forEach((dataset, index) => {
+      const value = valueMaps[index].get(timestamp);
+      row.push(value === undefined ? '' : String(value).replace('.', ','), dataset.unit || '');
+    });
+    return row;
+  })];
+  return `\uFEFF${rows.map(row => row.map(csvCell).join(';')).join('\r\n')}`;
+}
+
+function downloadCsv(datasets, prefix) {
+  if (!datasets.length) return toast('Keine Werte zum Exportieren', true);
+  const content = wideSeriesCsv(datasets);
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob), link = document.createElement('a');
   const name = (state.bootstrap?.settings?.siteName || 'IOT-GLT').replace(/[^a-z0-9_-]+/gi, '-');
   link.href = url;
-  link.download = `${new Date().toISOString().slice(0, 10)}-Trend-${name}.csv`;
+  link.download = `${new Date().toISOString().slice(0, 10)}-${prefix}-${name}.csv`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function exportTrendCsv() {
+  downloadCsv(state.trendData, 'Trend');
 }
 
 async function loadTrend() {
@@ -1088,13 +1161,15 @@ function exportTrendPdf() {
 }
 
 async function showEnergyStatePicker() {
+  const csvSeries = state.energySeries.filter(series => series.sourceType === 'csv');
+  const objectSeries = state.energySeries.filter(series => series.sourceType !== 'csv');
   await showObjectPicker({
     title: 'ioBroker-Objektbaum · Energiedatenpunkte',
     numericOnly: true,
     multiple: true,
-    selected: state.energySeries,
+    selected: objectSeries,
     onApply: rows => {
-      state.energySeries = rows.map((row, index) => ({ ...row, color: state.energySeries.find(item => item.id === row.id)?.color || trendColor(index) }));
+      state.energySeries = [...csvSeries, ...rows.map((row, index) => ({ ...row, color: state.energySeries.find(item => item.id === row.id)?.color || trendColor(csvSeries.length + index) }))];
       if (!$('#energyState').value && state.energySeries[0]) $('#energyState').value = state.energySeries[0].id;
       renderEnergyHistory();
     }
@@ -1103,26 +1178,64 @@ async function showEnergyStatePicker() {
 
 function renderEnergyHistory() {
   const start = new Date(`${$('#energyStart').value}T00:00:00`).getTime(), end = new Date(`${$('#energyEnd').value}T23:59:59`).getTime();
-  $('#energyHistoryChart').innerHTML = multiTrendSvg(state.energyData, 'line', '', '', start, end);
-  $('#energyLegend').innerHTML = state.energySeries.map(series => `<div class="trendLegendItem"><i style="display:block;width:22px;height:5px;border-radius:3px;background:${escapeHtml(series.color)}"></i><strong>${escapeHtml(series.name || series.id)}</strong><small>${escapeHtml(series.unit || '')}</small><button class="quiet" data-remove-energy="${escapeHtml(series.id)}">Entfernen</button></div>`).join('');
+  $('#energyHistoryChart').innerHTML = multiTrendSvg(state.energyData, $('#energyChartType').value, '', '', start, end);
+  $('#energyLegend').innerHTML = state.energySeries.map(series => `<div class="trendLegendItem"><i class="trendSwatch ${trendColorClass(series.color)}"></i><strong>${escapeHtml(series.name || series.id)}</strong><small>${escapeHtml(series.unit || '')}</small><button class="quiet" data-remove-energy="${escapeHtml(series.id)}">Entfernen</button></div>`).join('');
   $$('[data-remove-energy]').forEach(button => button.addEventListener('click', () => {
     state.energySeries = state.energySeries.filter(item => item.id !== button.dataset.removeEnergy);
     state.energyData = state.energyData.filter(item => item.id !== button.dataset.removeEnergy);
     renderEnergyHistory();
   }));
+  bindEnergyNavigation();
 }
 
 async function loadEnergyHistory() {
   try {
     if (!state.energySeries.length) throw new Error('Bitte zuerst Energiedatenpunkte hinzufügen');
     const source = $('#energySource').value;
-    if (!source) throw new Error('Keine History- oder InfluxDB-Instanz konfiguriert');
+    if (!source && state.energySeries.some(series => series.sourceType !== 'csv')) throw new Error('Keine History- oder InfluxDB-Instanz konfiguriert');
     const start = new Date(`${$('#energyStart').value}T00:00:00`).getTime();
     const end = new Date(`${$('#energyEnd').value}T23:59:59`).getTime();
-    const results = await Promise.all(state.energySeries.map(series => api(`/api/history?id=${encodeURIComponent(series.id)}&source=${encodeURIComponent(source)}&start=${start}&end=${end}&resolution=300&count=5000`)));
+    const results = await Promise.all(state.energySeries.map(series => series.sourceType === 'csv'
+      ? { values: series.csvValues.filter(point => point.ts >= start && point.ts <= end) }
+      : api(`/api/history?id=${encodeURIComponent(series.id)}&source=${encodeURIComponent(source)}&start=${start}&end=${end}&resolution=300&count=5000`)));
     state.energyData = results.map((result, index) => ({ ...state.energySeries[index], values: (result.values || []).filter(item => Number.isFinite(Number(item.val))).map(item => ({ ts: Number(item.ts), val: Number(item.val) })) }));
     renderEnergyHistory();
   } catch (error) { toast(error.message, true); }
+}
+
+async function importEnergyCsv(file) {
+  const imported = await parseCsvSeries(file, state.energySeries.length);
+  if (!imported) return;
+  state.energySeries.push(...imported);
+  const timestamps = imported.flatMap(series => series.csvValues.map(point => point.ts));
+  $('#energyStart').value = new Date(Math.min(...timestamps)).toISOString().slice(0, 10);
+  $('#energyEnd').value = new Date(Math.max(...timestamps)).toISOString().slice(0, 10);
+  await loadEnergyHistory();
+  toast(`${imported.length} CSV-Zeitreihe${imported.length === 1 ? '' : 'n'} importiert`);
+}
+
+function exportEnergyCsv() {
+  downloadCsv(state.energyData, 'Energie');
+}
+
+function localDateValue(timestamp) {
+  const date = new Date(timestamp - new Date(timestamp).getTimezoneOffset() * 60000);
+  return date.toISOString().slice(0, 10);
+}
+
+function bindEnergyNavigation() {
+  const chart = $('#energyHistoryChart');
+  chart.onwheel = event => {
+    if (!state.energyData.length || !['bar', 'stackedBar', 'heat'].includes($('#energyChartType').value)) return;
+    event.preventDefault();
+    const start = new Date(`${$('#energyStart').value}T00:00:00`).getTime();
+    const end = new Date(`${$('#energyEnd').value}T23:59:59`).getTime();
+    const shift = Math.max(86400000, (end - start) * .12) * (event.deltaY > 0 ? 1 : -1);
+    $('#energyStart').value = localDateValue(start + shift);
+    $('#energyEnd').value = localDateValue(end + shift);
+    clearTimeout(state.energyScrollTimer);
+    state.energyScrollTimer = setTimeout(() => loadEnergyHistory(), 180);
+  };
 }
 
 async function loadReports() {
@@ -1305,6 +1418,13 @@ $('#dashboardRefresh').addEventListener('click', refreshDashboard);
 $('#createReport').addEventListener('click', createReport);
 $('#addEnergyStates').addEventListener('click', () => showEnergyStatePicker().catch(error => toast(error.message, true)));
 $('#loadEnergyHistory').addEventListener('click', loadEnergyHistory);
+$('#energyChartType').addEventListener('change', renderEnergyHistory);
+$('#exportEnergyCsv').addEventListener('click', exportEnergyCsv);
+$('#importEnergyCsv').addEventListener('click', () => $('#energyCsvInput').click());
+$('#energyCsvInput').addEventListener('change', event => {
+  const file = event.target.files?.[0];
+  importEnergyCsv(file).catch(error => toast(error.message, true)).finally(() => { event.target.value = ''; });
+});
 $('#pickEnergyState').addEventListener('click', () => showObjectPicker({ title: 'ioBroker-Objektbaum · Verbrauchsdatenpunkt', numericOnly: true, selected: $('#energyState').value ? [{ id: $('#energyState').value }] : [], onApply: rows => { $('#energyState').value = rows[0].id; } }).catch(error => toast(error.message, true)));
 $('#newUser').addEventListener('click', () => showUserDialog());
 $('#settingsFont').addEventListener('change', event => applyFont(event.target.value));

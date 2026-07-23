@@ -40,7 +40,7 @@
     </section>
 
     <section id="view-visualization" class="view">
-      <div class="viewHead"><div><p class="eyebrow">LIVE-ANLAGENBILDER</p><h1>Visualisierung</h1></div><div class="actions"><button id="togglePlantTree" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Anlagenbaum ein- oder ausklappen" title="Anlagenbaum ein- oder ausklappen"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button><a id="openVisExternal" class="quiet buttonLink" href="#" target="_blank" rel="noopener" hidden>Ansicht extern öffnen</a></div></div>
+      <div class="viewHead"><div class="viewTitleControls"><p class="eyebrow">LIVE-ANLAGENBILDER</p><h1>Visualisierung</h1><button id="togglePlantTree" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Anlagenbaum ein- oder ausklappen" title="Anlagenbaum ein- oder ausklappen"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button></div><a id="openVisExternal" class="quiet buttonLink" href="#" target="_blank" rel="noopener" hidden>Ansicht extern öffnen</a></div>
       <div class="visualizationLayout">
         <aside class="plantTreePanel panel"><div class="panelHead"><h2>Anlagenbaum</h2></div><div id="plantTree" class="plantTree"></div></aside>
         <section class="visFramePanel panel"><div class="visFrameHead"><h2 id="visFrameTitle">Anlagenansicht</h2></div><iframe id="visFrame" class="visFrame" title="ioBroker VIS Anlagenansicht" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-pointer-lock allow-presentation" referrerpolicy="strict-origin-when-cross-origin" hidden></iframe><div id="internalVisual" class="visualShell"><div id="liveCanvas" class="plantCanvas"></div></div><div id="visFrameEmpty" class="visFrameEmpty" hidden></div></section>
@@ -48,7 +48,7 @@
     </section>
 
     <section id="view-trends" class="view">
-      <div class="viewHead"><div><p class="eyebrow">ZEITREIHEN</p><h1>Trendkurven</h1></div><button id="toggleTrendSettings" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Trendwerkzeuge ein- oder ausblenden" title="Trendwerkzeuge ein- oder ausblenden"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button></div>
+      <div class="viewHead"><div class="viewTitleControls"><p class="eyebrow">ZEITREIHEN</p><h1>Trendkurven</h1><button id="toggleTrendSettings" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Trendwerkzeuge ein- oder ausblenden" title="Trendwerkzeuge ein- oder ausblenden"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button></div></div>
       <div id="trendControls" class="trendControls collapsibleSettings">
         <div class="actions trendActions"><button id="importTrendCsv" class="quiet">CSV importieren</button><input id="trendCsvInput" type="file" accept=".csv,text/csv" hidden><button id="exportTrendCsv" class="quiet">CSV exportieren</button><button id="exportTrendPdf" class="quiet">PDF direkt herunterladen</button><button id="addTrendStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadTrend" class="primary">Aktualisieren</button></div>
         <div id="trendSettings" class="filterBar trendFilters">
@@ -65,10 +65,11 @@
     </section>
 
     <section id="view-energy" class="view">
-      <div class="viewHead"><div><p class="eyebrow">VERBRAUCH · KOSTEN · CO₂</p><h1>Energiemanagement</h1></div><button id="toggleEnergySettings" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Energiewerkzeuge ein- oder ausblenden" title="Energiewerkzeuge ein- oder ausblenden"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button></div>
-      <div id="energyControls" class="energyControls collapsibleSettings"><div class="actions energyActions"><button id="addEnergyStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadEnergyHistory" class="quiet">Historische Daten laden</button><button id="createReport" class="primary">Bericht berechnen</button></div>
+      <div class="viewHead"><div class="viewTitleControls"><p class="eyebrow">VERBRAUCH · KOSTEN · CO₂</p><h1>Energiemanagement</h1><button id="toggleEnergySettings" class="quiet hamburgerToggle" aria-expanded="true" aria-label="Energiewerkzeuge ein- oder ausblenden" title="Energiewerkzeuge ein- oder ausblenden"><span class="hamburgerToggleIcon" aria-hidden="true"><i></i><i></i><i></i></span></button></div></div>
+      <div id="energyControls" class="energyControls collapsibleSettings"><div class="actions energyActions"><button id="importEnergyCsv" class="quiet">CSV importieren</button><input id="energyCsvInput" type="file" accept=".csv,text/csv" hidden><button id="exportEnergyCsv" class="quiet">CSV exportieren</button><button id="addEnergyStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadEnergyHistory" class="quiet">Historische Daten laden</button><button id="createReport" class="primary">Bericht berechnen</button></div>
       <div id="energySettings" class="filterBar energyFilters">
         <label>Datenbank<select id="energySource"></select></label>
+        <label>Darstellung<select id="energyChartType"><option value="bar">Balkendiagramm</option><option value="stackedBar">Gestapelte Balken</option><option value="pie">Tortendiagramm</option><option value="donut">Ring-Tortendiagramm</option><option value="heat">Heatmap</option></select></label>
         <label>Berichtsname<input id="reportName" value="Energieauswertung"></label>
         <label>Verbrauchsdatenpunkt<div class="objectInput"><input id="energyState" readonly placeholder="kWh-Zähler"><button id="pickEnergyState" type="button" class="quiet">Objekte</button></div></label>
         <label>Berechnung<select id="energyMode"><option value="counter">Zählerdifferenz</option><option value="sum">Summe</option><option value="average">Mittelwert</option></select></label>

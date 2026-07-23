@@ -17,9 +17,9 @@ IOT GLT ist ein responsiver ioBroker-Adapter für technische Gebäudevisualisier
 - Dynamische Anlagenbilder mit Hintergrundbildern und frei positionierbaren Einblendpunkten
 - Analoge Einblendpunkte öffnen direkt die zugehörige Trendansicht
 - Schreibbare digitale Datenpunkte können durch berechtigte Benutzer geschaltet werden
-- Trendkurven als Linie, Stufe, Balken, Torte oder Heatmap inklusive Mehrfachachsen, einstellbarer Linienstärke, reversiblem Zoom, Tooltips, Farbpalette sowie PDF- und CSV-Export
+- Trendkurven als Linie, Stufe, Balken, Torte oder Heatmap inklusive Mehrfachachsen, einstellbarer Linienstärke, reversiblem Zoom, Tooltips, Farbpalette sowie PDF- und Mehrreihen-CSV-Export
 - CSV-Zeitreihen können gemeinsam mit History- oder InfluxDB-Daten im selben Diagramm ausgewertet werden
-- Historischer Analysebereich im Energiemanagement mit History- und InfluxDB-Daten
+- Historischer Analysebereich im Energiemanagement mit History-, InfluxDB- und CSV-Daten sowie Balken-, gestapelten Balken-, Torten-, Ring- und Heatmap-Diagrammen
 - Energieberichte aus Zählerdifferenz, Summe oder Mittelwert
 - Kostenberechnung über einen frei definierbaren kWh-Preis
 - CO₂-Bilanzierung über einen frei definierbaren Emissionsfaktor
