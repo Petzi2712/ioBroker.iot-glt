@@ -2,7 +2,7 @@
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
-const state = { bootstrap: null, user: null, csrf: '', pages: [], navigationTree: [], selectedTreeId: '', expandedTreeIds: new Set(), currentView: 'dashboard', editorPage: 0, selectedWidget: null, stateCache: new Map(), reports: [], trendSeries: [], trendData: [], autoLogoutTimer: null, lastKeepAlive: 0, treeDragActive: false, dashboardEdit: false, dashboardActiveId: null, dashboardWidgets: [] };
+const state = { bootstrap: null, user: null, csrf: '', pages: [], navigationTree: [], selectedTreeId: '', expandedTreeIds: new Set(), currentView: 'dashboard', editorPage: 0, selectedWidget: null, stateCache: new Map(), reports: [], trendSeries: [], trendData: [], energySeries: [], energyData: [], users: [], userSearch: '', userSort: { key: 'displayName', direction: 1 }, autoLogoutTimer: null, lastKeepAlive: 0, treeDragActive: false, dashboardEdit: false, dashboardActiveId: null, dashboardWidgets: [] };
 const uid = () => globalThis.crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 function escapeHtml(value) {
@@ -53,6 +53,42 @@ function modal(title, body, actions = []) {
 
 function closeModal() { $('#modal').close(); }
 
+async function showObjectPicker({ title = 'ioBroker-Objektbaum', numericOnly = false, multiple = false, selected = [], onApply }) {
+  const selectedMap = new Map((selected || []).map(item => [typeof item === 'string' ? item : item.id, typeof item === 'string' ? { id: item, name: item, unit: '' } : item]));
+  const dialog = document.createElement('dialog');
+  dialog.className = 'objectPickerDialog';
+  dialog.innerHTML = `<form method="dialog"><header><h2>${escapeHtml(title)}</h2><button value="cancel" aria-label="Schließen">×</button></header><div class="objectPicker"><label class="objectPickerSearch">Objekte durchsuchen<input class="objectPickerSearchInput" type="search" placeholder="Name, Rolle oder vollständige DP-Adresse"></label><div class="objectPickerResults"><div class="empty">Objektbaum wird geladen …</div></div></div><footer><button type="button" class="quiet objectPickerCancel">Abbrechen</button><button type="button" class="primary objectPickerApply">${multiple ? 'Auswahl übernehmen' : 'Datenpunkt übernehmen'}</button></footer></form>`;
+  document.body.append(dialog);
+  const close = () => { dialog.close(); dialog.remove(); };
+  dialog.querySelector('.objectPickerCancel').addEventListener('click', close);
+  dialog.querySelector('header button').addEventListener('click', event => { event.preventDefault(); close(); });
+  dialog.querySelector('.objectPickerApply').addEventListener('click', () => {
+    const rows = [...selectedMap.values()];
+    if (!rows.length) return toast('Bitte mindestens einen Datenpunkt auswählen', true);
+    close();
+    onApply?.(multiple ? rows : rows.slice(-1));
+  });
+  dialog.addEventListener('click', event => { if (event.target === dialog) close(); });
+  dialog.showModal();
+  let timer;
+  const search = async query => {
+    const rows = await api(`/${numericOnly ? 'api/trend-states' : 'api/states'}?query=${encodeURIComponent(query)}`);
+    const target = dialog.querySelector('.objectPickerResults');
+    target.innerHTML = rows.length ? rows.map(row => `<label class="objectPickerRow"><input type="${multiple ? 'checkbox' : 'radio'}" name="objectPickerItem" value="${escapeHtml(row.id)}" ${selectedMap.has(row.id) ? 'checked' : ''}><span><strong>${escapeHtml(row.name || row.id)}</strong><small>${escapeHtml(row.id)}${row.role ? ` · ${escapeHtml(row.role)}` : ''}</small></span><small>${escapeHtml(row.unit || '')}</small></label>`).join('') : '<div class="empty">Keine passenden Datenpunkte gefunden.</div>';
+    target.querySelectorAll('input').forEach(input => input.addEventListener('change', () => {
+      const row = rows.find(item => item.id === input.value);
+      if (!multiple) selectedMap.clear();
+      if (input.checked && row) selectedMap.set(row.id, row);
+      else selectedMap.delete(input.value);
+    }));
+  };
+  dialog.querySelector('.objectPickerSearchInput').addEventListener('input', event => {
+    clearTimeout(timer);
+    timer = setTimeout(() => search(event.target.value).catch(error => toast(error.message, true)), 250);
+  });
+  await search('');
+}
+
 function can(module, action = 'read') {
   return state.user?.role === 'admin' || Boolean(state.user?.permissions?.[module]?.[action]);
 }
@@ -60,6 +96,12 @@ function can(module, action = 'read') {
 function applyFont(value) {
   document.body.classList.toggle('font-material', value === 'material');
   document.body.classList.toggle('font-apple', value !== 'material');
+}
+
+function applyTheme(value = 'light') {
+  const resolved = value === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : value;
+  document.documentElement.dataset.theme = resolved === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.themePreference = value;
 }
 
 async function bootstrap() {
@@ -73,9 +115,11 @@ async function bootstrap() {
   if (!state.expandedTreeIds.size) state.navigationTree.filter(node => !node.url).forEach(node => state.expandedTreeIds.add(node.id));
   document.documentElement.style.setProperty('--accent', '#fe6e00');
   applyFont(data.settings?.fontFamily || 'apple');
+  applyTheme(data.settings?.theme || 'light');
   $('#headerSiteName').textContent = data.settings?.siteName || 'Gebäude Zentrale';
   $('#settingsSiteName').value = data.settings?.siteName || 'Gebäude Zentrale';
   $('#settingsFont').value = data.settings?.fontFamily === 'material' ? 'material' : 'apple';
+  $('#settingsTheme').value = ['light', 'dark', 'system'].includes(data.settings?.theme) ? data.settings.theme : 'light';
   $('#settingsAutoLogoff').value = String(data.settings?.autoLogoffMinutes || 30);
   $('#settingsIoBrokerUrl').value = data.settings?.ioBrokerAdminUrl || '';
   const authenticated = state.user?.id && state.user.id !== 'public';
@@ -83,6 +127,7 @@ async function bootstrap() {
   $('#headerUserAvatar').textContent = authenticated ? String(state.user.displayName || state.user.username || '?').split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() : '?';
   $('#sideUser').textContent = state.user?.displayName || state.user?.username || 'Nicht angemeldet';
   $('#sideRole').textContent = state.user?.role === 'admin' ? 'Administrator' : 'Nur lesen';
+  $('#sideVersion').textContent = data.adapter?.version || '0.0.0';
   $$('#navigation button').forEach(button => {
     const module = button.dataset.view;
     button.hidden = !data.modules?.[module];
@@ -94,6 +139,7 @@ async function bootstrap() {
   $('#newUser').hidden = !can('users', 'write');
   const sources = data.adapter?.historySources || [];
   $('#trendSource').innerHTML = sources.length ? sources.map(source => `<option value="${escapeHtml(source.instance)}">${source.type === 'influxdb' ? 'InfluxDB' : 'History'} · ${escapeHtml(source.instance)}</option>`).join('') : '<option value="">Keine Zeitreihendatenbank konfiguriert</option>';
+  $('#energySource').innerHTML = $('#trendSource').innerHTML;
   fillPageSelects();
   if (data.mustChangePassword) showChangePassword();
   resetAutoLogout();
@@ -109,6 +155,7 @@ function firstAllowedView(preferred) {
 async function showView(name) {
   name = firstAllowedView(name);
   state.currentView = name;
+  $('#tooltip').style.display = 'none';
   $$('.view').forEach(view => view.classList.toggle('active', view.id === `view-${name}`));
   $$('#navigation button').forEach(button => button.classList.toggle('active', button.dataset.view === name));
   if (innerWidth < 900) toggleMenu(false);
@@ -127,6 +174,14 @@ function toggleMenu(open = !document.body.classList.contains('menu-open')) {
   document.body.classList.toggle('menu-open', open);
   $('#menuToggle').setAttribute('aria-expanded', String(open));
   $('#sidebar').setAttribute('aria-hidden', String(!open));
+}
+
+function toggleSettingsPanel(button, panel, view, collapsedClass) {
+  const collapsed = !panel.classList.contains('collapsed');
+  panel.classList.toggle('collapsed', collapsed);
+  view.classList.toggle(collapsedClass, collapsed);
+  button.setAttribute('aria-expanded', String(!collapsed));
+  button.textContent = collapsed ? 'Einstellungen ausklappen' : 'Einstellungen einklappen';
 }
 
 function resetAutoLogout() {
@@ -355,18 +410,16 @@ async function selectTreeNode(id) {
   state.selectedTreeId = id;
   renderPlantTree();
   $('#visFrameTitle').textContent = node.label;
-  $('#visFramePath').textContent = node.url || 'Strukturebene ohne eigene Ansicht';
   const url = resolvedVisUrl(node.url), frame = $('#visFrame'), internal = $('#internalVisual'), empty = $('#visFrameEmpty'), external = $('#openVisExternal');
-  const policyBlocked = Boolean(url && blocksEmbeddingByPolicy(url));
-  frame.hidden = !url || policyBlocked; internal.hidden = true; empty.hidden = Boolean(url) && !policyBlocked; external.hidden = !url;
-  if (policyBlocked) {
-    frame.removeAttribute('src'); external.href = url;
-    empty.innerHTML = `<strong>${escapeHtml(node.label)} blockiert die Darstellung im eingebetteten Browserfenster.</strong><span>Die Adresse ist gültig. Der Anbieter sendet jedoch eine X-Frame-Options-/CSP-Sperre, die ein Webbrowser nicht umgehen darf.</span><a class="quiet buttonLink" href="${escapeHtml(url)}" target="_blank" rel="noopener">Im vollständigen Browser öffnen</a>`;
-  } else if (url) {
-    empty.innerHTML = '<strong>Für diesen Eintrag ist noch keine VIS-Ansicht hinterlegt.</strong><span>Den Link können Administratoren unter „Visualisierung einrichten“ ergänzen.</span>';
-    if (frame.getAttribute('src') !== url) frame.src = url; external.href = url;
+  frame.hidden = !url;
+  internal.hidden = true;
+  empty.hidden = true;
+  external.hidden = !url;
+  if (url) {
+    if (frame.getAttribute('src') !== url) frame.src = url;
+    external.href = url;
   } else {
-    empty.innerHTML = '<strong>Für diesen Eintrag ist noch keine VIS-Ansicht hinterlegt.</strong><span>Den Link können Administratoren unter „Visualisierung einrichten“ ergänzen.</span>';
+    frame.removeAttribute('src');
   }
 }
 
@@ -375,7 +428,7 @@ async function renderLivePage() {
   let selected = state.navigationTree.find(node => node.id === state.selectedTreeId);
   if (!selected) selected = state.navigationTree.find(node => node.url) || state.navigationTree[0];
   if (selected) await selectTreeNode(selected.id);
-  else $('#visFrameEmpty').hidden = false;
+  else $('#visFrameEmpty').hidden = true;
 }
 
 function treeDescendants(id, result = new Set()) {
@@ -474,7 +527,7 @@ function renderEditor() {
 function renderInspector(widget, page) {
   const node = $('#widgetInspector');
   if (!widget) { node.innerHTML = '<p class="muted">Ein Element im Anlagenbild auswählen.</p>'; return; }
-  node.innerHTML = `<label>Beschriftung<input id="inspectLabel" value="${escapeHtml(widget.label || '')}"></label>${!['heatingCurve','hx'].includes(widget.type) ? `<label>Datenpunkt<input id="inspectState" list="stateOptions" value="${escapeHtml(widget.stateId || '')}"></label><label>Einheit<input id="inspectUnit" value="${escapeHtml(widget.unit || '')}"></label>` : ''}<label>Breite<input id="inspectWidth" type="number" min="80" max="900" value="${widget.width || (['heatingCurve','hx'].includes(widget.type) ? 320 : 120)}"></label><button id="deleteWidget">Element löschen</button>`;
+  node.innerHTML = `<label>Beschriftung<input id="inspectLabel" value="${escapeHtml(widget.label || '')}"></label>${!['heatingCurve','hx'].includes(widget.type) ? `<label>Datenpunkt<div class="objectInput"><input id="inspectState" readonly value="${escapeHtml(widget.stateId || '')}"><button id="pickInspectState" type="button" class="quiet">Objekte</button></div></label><label>Einheit<input id="inspectUnit" value="${escapeHtml(widget.unit || '')}"></label>` : ''}<label>Breite<input id="inspectWidth" type="number" min="80" max="900" value="${widget.width || (['heatingCurve','hx'].includes(widget.type) ? 320 : 120)}"></label><button id="deleteWidget">Element löschen</button>`;
   const update = () => {
     widget.label = $('#inspectLabel').value;
     if ($('#inspectState')) widget.stateId = $('#inspectState').value;
@@ -483,6 +536,7 @@ function renderInspector(widget, page) {
     renderEditor();
   };
   node.querySelectorAll('input').forEach(input => input.addEventListener('change', update));
+  $('#pickInspectState')?.addEventListener('click', () => showObjectPicker({ title: 'ioBroker-Objektbaum · Anlagenbild', selected: widget.stateId ? [{ id: widget.stateId }] : [], onApply: rows => { widget.stateId = rows[0].id; widget.unit = rows[0].unit || widget.unit; renderEditor(); } }).catch(error => toast(error.message, true)));
   $('#deleteWidget').addEventListener('click', () => { page.widgets = page.widgets.filter(item => item.id !== widget.id); state.selectedWidget = null; renderEditor(); });
 }
 
@@ -520,10 +574,11 @@ function showAlarmDetails(alarm) {
 }
 
 function showAddAlarm() {
-  modal('Melderegel anlegen', '<label>Name<input id="alarmName" value="Störmeldung"></label><label>Datenpunkt / DP-Adresse<input id="alarmState" list="stateOptions"></label><label>Technischer Einbauort<input id="alarmLocation" placeholder="z. B. Gebäude A · UG · Schaltschrank MSR-01"></label><label>Prüfung<select id="alarmOperator"><option value="truthy">Wert ist wahr</option><option value="eq">Gleich</option><option value="ne">Ungleich</option><option value="gt">Größer</option><option value="lt">Kleiner</option></select></label><label>Grenzwert<input id="alarmValue"></label><label>Priorität<select id="alarmSeverity"><option value="alarm">Störung</option><option value="warning">Warnung</option></select></label>', [
+  modal('Melderegel anlegen', '<label>Name<input id="alarmName" value="Störmeldung"></label><label>Datenpunkt / DP-Adresse<div class="objectInput"><input id="alarmState" readonly><button id="pickAlarmState" type="button" class="quiet">Objekte</button></div></label><label>Technischer Einbauort<input id="alarmLocation" placeholder="z. B. Gebäude A · UG · Schaltschrank MSR-01"></label><label>Prüfung<select id="alarmOperator"><option value="truthy">Wert ist wahr</option><option value="eq">Gleich</option><option value="ne">Ungleich</option><option value="gt">Größer</option><option value="lt">Kleiner</option></select></label><label>Grenzwert<input id="alarmValue"></label><label>Priorität<select id="alarmSeverity"><option value="alarm">Störung</option><option value="warning">Warnung</option></select></label>', [
     { label: 'Abbrechen', click: closeModal },
     { label: 'Anlegen', primary: true, click: async () => { try { const alarms = await api('/api/alarms'); alarms.push({ name: $('#alarmName').value, stateId: $('#alarmState').value, technicalLocation: $('#alarmLocation').value, operator: $('#alarmOperator').value, value: $('#alarmValue').value, severity: $('#alarmSeverity').value }); await api('/api/alarms', { method: 'PUT', body: alarms }); closeModal(); await loadAlarms(); toast('Melderegel gespeichert'); } catch (error) { toast(error.message, true); } } }
   ]);
+  $('#pickAlarmState').addEventListener('click', () => showObjectPicker({ title: 'ioBroker-Objektbaum · Störmeldepunkt', selected: $('#alarmState').value ? [{ id: $('#alarmState').value }] : [], onApply: rows => { $('#alarmState').value = rows[0].id; } }).catch(error => toast(error.message, true)));
 }
 
 function chartSvg(values, type) {
@@ -568,11 +623,11 @@ function trendColor(index) {
 
 const trendPalette = ['#2f80ed','#56ccf2','#27ae60','#6fcf97','#f2994a','#f2c94c','#eb5757','#ff7a90','#9b51e0','#bb6bd9','#34495e','#7f8c8d','#00a8a8','#8d6e63','#c2185b','#5c6bc0'];
 
-function multiTrendSvg(datasets, type, requestedMin, requestedMax) {
+function multiTrendSvg(datasets, type, requestedMin, requestedMax, rangeStart = null, rangeEnd = null) {
   const width = 1000, height = 350, top = 18, bottom = 42;
   const all = datasets.flatMap(dataset => dataset.values);
   if (!all.length) return '<div class="empty">Für diese Auswahl wurden keine numerischen Werte gefunden.</div>';
-  const start = new Date($('#trendStart').value).getTime(), end = new Date($('#trendEnd').value).getTime();
+  const start = rangeStart ?? new Date($('#trendStart').value).getTime(), end = rangeEnd ?? new Date($('#trendEnd').value).getTime();
   const units = [...new Set(datasets.map(dataset => dataset.unit || 'Wert'))];
   const leftAxisCount = Math.ceil(units.length / 2), rightAxisCount = Math.floor(units.length / 2);
   const left = 24 + leftAxisCount * 58, right = 24 + rightAxisCount * 58, plotHeight = height - top - bottom, timeSpan = Math.max(1, end - start);
@@ -585,6 +640,19 @@ function multiTrendSvg(datasets, type, requestedMin, requestedMax) {
     return [unit, { unit, index, min, max, span: Math.max(.0001, max - min), side: index % 2 ? 'right' : 'left', lane: Math.floor(index / 2) }];
   }));
   const y = (value, unit) => { const scale = scales.get(unit || 'Wert'); return height - bottom - (value - scale.min) / scale.span * plotHeight; };
+  if (type === 'pie') {
+    const totals = datasets.map(dataset => Math.abs(dataset.values.reduce((sum, item) => sum + Number(item.val || 0), 0) / Math.max(1, dataset.values.length)));
+    const sum = totals.reduce((total, value) => total + value, 0) || 1;
+    let angle = -Math.PI / 2;
+    const paths = totals.map((value, index) => {
+      const next = angle + value / sum * Math.PI * 2, large = next - angle > Math.PI ? 1 : 0;
+      const x1 = 500 + Math.cos(angle) * 135, y1 = 175 + Math.sin(angle) * 135, x2 = 500 + Math.cos(next) * 135, y2 = 175 + Math.sin(next) * 135;
+      const path = `<path d="M500 175L${x1} ${y1}A135 135 0 ${large} 1 ${x2} ${y2}Z" fill="${datasets[index].color}"><title>${escapeHtml(datasets[index].name)} · ${number(value, 3)} ${escapeHtml(datasets[index].unit || '')}</title></path>`;
+      angle = next;
+      return path;
+    }).join('');
+    return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Tortendiagramm">${paths}</svg>`;
+  }
   if (type === 'heat') {
     const rowHeight = Math.min(44, plotHeight / Math.max(1,datasets.length)), cols = 48, cellWidth = (width-left-right) / cols;
     let cells = '';
@@ -622,16 +690,18 @@ function multiTrendSvg(datasets, type, requestedMin, requestedMax) {
 }
 
 function renderTrendLegend() {
-  $('#trendLegend').innerHTML = state.trendSeries.map(series => `<div class="trendLegendItem" data-trend-info="${escapeHtml(series.id)}"><button class="trendColorButton" style="--trend-color:${escapeHtml(series.color)}" data-open-trend-colors="${escapeHtml(series.id)}" aria-label="Farbe für ${escapeHtml(series.name || series.id)} ändern"><i></i></button><strong>${escapeHtml(series.name || series.id)}</strong><button class="quiet" data-remove-trend="${escapeHtml(series.id)}">Entfernen</button></div>`).join('');
+  $('#trendLegend').innerHTML = state.trendSeries.map(series => `<div class="trendLegendItem" data-trend-info="${escapeHtml(series.id)}"><button class="trendColorButton" style="--trend-color:${escapeHtml(series.color)}" data-open-trend-colors="${escapeHtml(series.id)}" aria-label="Farbe für ${escapeHtml(series.name || series.id)} ändern"><i style="background-color:${escapeHtml(series.color)}"></i></button><strong>${escapeHtml(series.name || series.id)}</strong><button class="quiet" data-remove-trend="${escapeHtml(series.id)}">Entfernen</button></div>`).join('');
 }
 
 function openTrendColorPalette(seriesId, anchor) {
   const palette = $('#trendColorPalette'), rect = anchor.getBoundingClientRect();
   palette.dataset.seriesId = seriesId;
-  palette.innerHTML = trendPalette.map(color => `<button type="button" style="--palette-color:${color}" data-palette-color="${color}" aria-label="Farbe ${color}"></button>`).join('');
-  palette.style.left = `${Math.min(innerWidth-190,Math.max(8,rect.left))}px`;
-  palette.style.top = `${Math.min(innerHeight-150,rect.bottom+8)}px`;
+  palette.innerHTML = trendPalette.map(color => `<button type="button" style="--palette-color:${color};background-color:${color}" data-palette-color="${color}" aria-label="Farbe ${color}"></button>`).join('');
   palette.hidden = false;
+  const paletteRect = palette.getBoundingClientRect();
+  palette.style.left = `${Math.max(8, Math.min(innerWidth - paletteRect.width - 8, rect.left))}px`;
+  const below = rect.bottom + 8, above = rect.top - paletteRect.height - 8;
+  palette.style.top = `${below + paletteRect.height <= innerHeight - 8 ? below : Math.max(8, above)}px`;
 }
 
 function renderCurrentTrend() {
@@ -646,6 +716,64 @@ function renderCurrentTrend() {
     tooltip.style.left = `${event.clientX + 12}px`; tooltip.style.top = `${event.clientY + 12}px`; tooltip.style.display = 'block';
   });
   hover.addEventListener('pointerleave', () => tooltip.style.display = 'none');
+  bindTrendNavigation();
+}
+
+function bindTrendNavigation() {
+  const chart = $('#trendChart');
+  chart.onwheel = event => {
+    if (!state.trendData.length) return;
+    event.preventDefault();
+    const values = state.trendData.flatMap(dataset => dataset.values.map(point => point.val));
+    let min = $('#trendMin').value === '' ? Math.min(...values) : Number($('#trendMin').value);
+    let max = $('#trendMax').value === '' ? Math.max(...values) : Number($('#trendMax').value);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) return;
+    const factor = event.deltaY < 0 ? .82 : 1.22;
+    const center = min + (1 - Math.max(0, Math.min(1, event.offsetY / Math.max(1, chart.clientHeight)))) * (max - min);
+    min = center - (center - min) * factor;
+    max = center + (max - center) * factor;
+    $('#trendMin').value = String(Number(min.toPrecision(8)));
+    $('#trendMax').value = String(Number(max.toPrecision(8)));
+    renderCurrentTrend();
+  };
+  chart.ondblclick = () => {
+    $('#trendMin').value = '';
+    $('#trendMax').value = '';
+    renderCurrentTrend();
+  };
+  chart.onpointerdown = event => {
+    if (event.button !== 0 || !state.trendData.length) return;
+    const rect = chart.getBoundingClientRect();
+    const startX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const selection = document.createElement('div');
+    selection.className = 'trendSelection';
+    selection.style.left = `${startX}px`;
+    selection.style.width = '0px';
+    chart.append(selection);
+    const move = moveEvent => {
+      const x = Math.max(0, Math.min(rect.width, moveEvent.clientX - rect.left));
+      selection.style.left = `${Math.min(startX, x)}px`;
+      selection.style.width = `${Math.abs(x - startX)}px`;
+    };
+    const up = upEvent => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      const endX = Math.max(0, Math.min(rect.width, upEvent.clientX - rect.left));
+      const distance = Math.abs(endX - startX);
+      selection.remove();
+      if (distance < 24) return;
+      const oldStart = new Date($('#trendStart').value).getTime();
+      const oldEnd = new Date($('#trendEnd').value).getTime();
+      const leftRatio = Math.min(startX, endX) / rect.width;
+      const rightRatio = Math.max(startX, endX) / rect.width;
+      $('#trendStart').value = dateTimeValue(oldStart + leftRatio * (oldEnd - oldStart));
+      $('#trendEnd').value = dateTimeValue(oldStart + rightRatio * (oldEnd - oldStart));
+      $('#trendPeriod').value = 'custom';
+      loadTrend();
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  };
 }
 
 async function loadTrend() {
@@ -657,28 +785,22 @@ async function loadTrend() {
     const resolution = Number($('#trendResolution').value) || 0;
     const results = await Promise.all(state.trendSeries.map(series => api(`/api/history?id=${encodeURIComponent(series.id)}&source=${encodeURIComponent(source)}&start=${start}&end=${end}&resolution=${resolution}&count=${resolution ? 5000 : 10000}`)));
     state.trendData = results.map((result,index) => ({ ...state.trendSeries[index], values: result.values.filter(item => Number.isFinite(Number(item.val))).map(item => ({ ts: Number(item.ts), val: Number(item.val) })) }));
-    const total = state.trendData.reduce((sum,dataset) => sum + dataset.values.length,0);
-    $('#trendMeta').innerHTML = `<h2>${state.trendSeries.length} Datenpunkte</h2><span>${total} Werte · ${escapeHtml(source)} · ${escapeHtml($('#trendResolution').selectedOptions[0].textContent)}</span>`;
     renderCurrentTrend();
   } catch (error) { toast(error.message, true); }
 }
 
 async function showTrendStatePicker() {
-  const selected = new Set(state.trendSeries.map(series => series.id)), metadata = new Map(state.trendSeries.map(series => [series.id, series]));
-  modal('Datenpunkte hinzufügen', '<label>Datenpunkte suchen<input id="trendStateSearch" placeholder="Name oder DP-Adresse"></label><div id="trendStateResults" class="trendStateResults empty">Datenpunkte werden geladen …</div>', [
-    { label: 'Abbrechen', click: closeModal },
-    { label: 'Auswahl übernehmen', primary: true, click: () => { state.trendSeries = [...selected].map((id,index) => metadata.get(id) || { id, name: id, unit: '', color: trendColor(index) }); closeModal(); renderTrendLegend(); if (state.trendSeries.length) loadTrend(); } }
-  ]);
-  let timer;
-  const search = async query => {
-    const rows = await api(`/api/trend-states?query=${encodeURIComponent(query)}`);
-    rows.forEach(row => metadata.set(row.id, { ...metadata.get(row.id), ...row, color: metadata.get(row.id)?.color || trendColor(metadata.size) }));
-    $('#trendStateResults').classList.toggle('empty', !rows.length);
-    $('#trendStateResults').innerHTML = rows.length ? rows.map(row => `<label class="trendStateRow"><input type="checkbox" value="${escapeHtml(row.id)}" ${selected.has(row.id) ? 'checked' : ''}><span><strong>${escapeHtml(row.name)}</strong><small>${escapeHtml(row.id)}</small></span><small>${escapeHtml(row.unit || '')}</small></label>`).join('') : 'Keine passenden numerischen Datenpunkte gefunden.';
-    $$('#trendStateResults input').forEach(input => input.addEventListener('change', () => input.checked ? selected.add(input.value) : selected.delete(input.value)));
-  };
-  $('#trendStateSearch').addEventListener('input', event => { clearTimeout(timer); timer = setTimeout(() => search(event.target.value).catch(error => toast(error.message,true)),250); });
-  await search('');
+  await showObjectPicker({
+    title: 'ioBroker-Objektbaum · Trenddatenpunkte',
+    numericOnly: true,
+    multiple: true,
+    selected: state.trendSeries,
+    onApply: rows => {
+      state.trendSeries = rows.map((row, index) => ({ ...row, color: state.trendSeries.find(item => item.id === row.id)?.color || trendColor(index) }));
+      renderTrendLegend();
+      if (state.trendSeries.length) loadTrend();
+    }
+  });
 }
 
 const dashboardDefaults = [
@@ -724,9 +846,9 @@ function renderDashboard() {
 function showDashboardDialog(id=null) {
   state.dashboardActiveId=id;
   const widget=dashboardConfig().find(item=>item.id===id) || { title:'Neuer Datenpunkt',dp:'',unit:'',type:'line',period:24,min:0,max:100,cols:4,rows:3,value:50 };
-  modal(id?'Kachel bearbeiten':'Datenpunkt hinzufügen',`<div class="dashboardForm"><label class="wide">Beschriftung<input id="dashboardTitle" value="${escapeHtml(widget.title)}"></label><label class="wide">ioBroker-Datenpunkt<input id="dashboardDp" list="dashboardStateOptions" value="${escapeHtml(widget.dp)}" placeholder="Datenpunkt suchen oder Adresse eingeben"><datalist id="dashboardStateOptions"></datalist></label><label>Darstellung<select id="dashboardType"><option value="line">Chart · Linie</option><option value="bar">Balkendiagramm</option><option value="heat">Heatmap</option><option value="fill">Füllstand</option><option value="gauge">Messinstrument</option><option value="table">Tabelle</option><option value="value">Einzelwert</option></select></label><label>Einheit<input id="dashboardUnit" value="${escapeHtml(widget.unit)}"></label><label>Zeitraum in Stunden<input id="dashboardPeriod" type="number" min="1" max="8760" value="${widget.period}"></label><label>Aktueller Wert<input id="dashboardValue" type="number" step="any" value="${widget.value}"></label><label>Skalierung min<input id="dashboardMin" type="number" step="any" value="${widget.min}"></label><label>Skalierung max<input id="dashboardMax" type="number" step="any" value="${widget.max}"></label><label>Breite<input id="dashboardCols" type="number" min="2" max="12" value="${widget.cols}"></label><label>Höhe<input id="dashboardRows" type="number" min="2" max="8" value="${widget.rows}"></label></div>`,[{label:'Abbrechen',click:closeModal},{label:'Speichern',primary:true,click:saveDashboardWidget}]);
+  modal(id?'Kachel bearbeiten':'Datenpunkt hinzufügen',`<div class="dashboardForm"><label class="wide">Beschriftung<input id="dashboardTitle" value="${escapeHtml(widget.title)}"></label><label class="wide">ioBroker-Datenpunkt<div class="objectInput"><input id="dashboardDp" readonly value="${escapeHtml(widget.dp)}" placeholder="Datenpunkt im Objektbaum auswählen"><button id="pickDashboardDp" type="button" class="quiet">Objekte</button></div></label><label>Darstellung<select id="dashboardType"><option value="line">Chart · Linie</option><option value="bar">Balkendiagramm</option><option value="heat">Heatmap</option><option value="fill">Füllstand</option><option value="gauge">Messinstrument</option><option value="table">Tabelle</option><option value="value">Einzelwert</option></select></label><label>Einheit<input id="dashboardUnit" value="${escapeHtml(widget.unit)}"></label><label>Zeitraum in Stunden<input id="dashboardPeriod" type="number" min="1" max="8760" value="${widget.period}"></label><label>Aktueller Wert<input id="dashboardValue" type="number" step="any" value="${widget.value}"></label><label>Skalierung min<input id="dashboardMin" type="number" step="any" value="${widget.min}"></label><label>Skalierung max<input id="dashboardMax" type="number" step="any" value="${widget.max}"></label><label>Breite<input id="dashboardCols" type="number" min="2" max="12" value="${widget.cols}"></label><label>Höhe<input id="dashboardRows" type="number" min="2" max="8" value="${widget.rows}"></label></div>`,[{label:'Abbrechen',click:closeModal},{label:'Speichern',primary:true,click:saveDashboardWidget}]);
   $('#dashboardType').value=widget.type;
-  let timer; const search=async query=>{const rows=await api(`/api/dashboard-states?query=${encodeURIComponent(query)}`);$('#dashboardStateOptions').innerHTML=rows.map(row=>`<option value="${escapeHtml(row.id)}">${escapeHtml(row.name)} · ${escapeHtml(row.unit)}</option>`).join('');}; $('#dashboardDp').addEventListener('input',event=>{clearTimeout(timer);timer=setTimeout(()=>search(event.target.value).catch(error=>toast(error.message,true)),250);}); search(widget.dp || '').catch(error=>toast(error.message,true));
+  $('#pickDashboardDp').addEventListener('click', () => showObjectPicker({ title: 'ioBroker-Objektbaum · Dashboard', selected: $('#dashboardDp').value ? [{ id: $('#dashboardDp').value }] : [], onApply: rows => { $('#dashboardDp').value = rows[0].id; $('#dashboardTitle').value = rows[0].name || $('#dashboardTitle').value; $('#dashboardUnit').value = rows[0].unit || $('#dashboardUnit').value; } }).catch(error => toast(error.message, true)));
 }
 
 function saveDashboardWidget() {
@@ -750,7 +872,7 @@ async function refreshDashboard() {
     const rows=ids.length?await api(`/api/visual-values?ids=${encodeURIComponent(ids.join(','))}`):[], values=new Map(rows.map(row=>[row.id,row.val])), source=state.bootstrap?.adapter?.historySources?.[0]?.instance, end=Date.now();
     widgets.forEach(widget=>{if(Number.isFinite(Number(values.get(widget.dp))))widget.value=Number(values.get(widget.dp));});
     if(source){await Promise.all(widgets.filter(widget=>ids.includes(widget.dp)&&['line','bar','heat','table'].includes(widget.type)).map(async widget=>{const start=end-Math.max(1,Number(widget.period)||24)*3600000,response=await api(`/api/history?id=${encodeURIComponent(widget.dp)}&source=${encodeURIComponent(source)}&start=${start}&end=${end}&aggregate=average&count=240`);widget.values=(response.values||[]).map(item=>Number(item.val)).filter(Number.isFinite);}));}
-    renderDashboard(); toast('Dashboard aktualisiert');
+    renderDashboard();
   } catch(error) { toast(error.message,true); }
 }
 
@@ -811,6 +933,44 @@ function exportTrendPdf() {
   link.href = url; link.download = `${dateCode}-Chart-${safeName}.pdf`; link.hidden = true; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url),10000); toast(`PDF heruntergeladen: ${link.download}`);
 }
 
+async function showEnergyStatePicker() {
+  await showObjectPicker({
+    title: 'ioBroker-Objektbaum · Energiedatenpunkte',
+    numericOnly: true,
+    multiple: true,
+    selected: state.energySeries,
+    onApply: rows => {
+      state.energySeries = rows.map((row, index) => ({ ...row, color: state.energySeries.find(item => item.id === row.id)?.color || trendColor(index) }));
+      if (!$('#energyState').value && state.energySeries[0]) $('#energyState').value = state.energySeries[0].id;
+      renderEnergyHistory();
+    }
+  });
+}
+
+function renderEnergyHistory() {
+  const start = new Date(`${$('#energyStart').value}T00:00:00`).getTime(), end = new Date(`${$('#energyEnd').value}T23:59:59`).getTime();
+  $('#energyHistoryChart').innerHTML = multiTrendSvg(state.energyData, 'line', '', '', start, end);
+  $('#energyLegend').innerHTML = state.energySeries.map(series => `<div class="trendLegendItem"><i style="display:block;width:22px;height:5px;border-radius:3px;background:${escapeHtml(series.color)}"></i><strong>${escapeHtml(series.name || series.id)}</strong><small>${escapeHtml(series.unit || '')}</small><button class="quiet" data-remove-energy="${escapeHtml(series.id)}">Entfernen</button></div>`).join('');
+  $$('[data-remove-energy]').forEach(button => button.addEventListener('click', () => {
+    state.energySeries = state.energySeries.filter(item => item.id !== button.dataset.removeEnergy);
+    state.energyData = state.energyData.filter(item => item.id !== button.dataset.removeEnergy);
+    renderEnergyHistory();
+  }));
+}
+
+async function loadEnergyHistory() {
+  try {
+    if (!state.energySeries.length) throw new Error('Bitte zuerst Energiedatenpunkte hinzufügen');
+    const source = $('#energySource').value;
+    if (!source) throw new Error('Keine History- oder InfluxDB-Instanz konfiguriert');
+    const start = new Date(`${$('#energyStart').value}T00:00:00`).getTime();
+    const end = new Date(`${$('#energyEnd').value}T23:59:59`).getTime();
+    const results = await Promise.all(state.energySeries.map(series => api(`/api/history?id=${encodeURIComponent(series.id)}&source=${encodeURIComponent(source)}&start=${start}&end=${end}&resolution=300&count=5000`)));
+    state.energyData = results.map((result, index) => ({ ...state.energySeries[index], values: (result.values || []).filter(item => Number.isFinite(Number(item.val))).map(item => ({ ts: Number(item.ts), val: Number(item.val) })) }));
+    renderEnergyHistory();
+  } catch (error) { toast(error.message, true); }
+}
+
 async function loadReports() {
   state.reports = await api('/api/reports');
   const currency = state.bootstrap.adapter.currency;
@@ -822,7 +982,7 @@ async function createReport() {
   try {
     const start = new Date($('#energyStart').value).getTime();
     const end = new Date(`${$('#energyEnd').value}T23:59:59`).getTime();
-    await api('/api/reports', { method: 'POST', body: { name: $('#reportName').value, stateId: $('#energyState').value, mode: $('#energyMode').value, pricePerKwh: Number($('#energyPrice').value), co2Factor: Number($('#energyCo2').value), start, end } });
+    await api('/api/reports', { method: 'POST', body: { name: $('#reportName').value, stateId: $('#energyState').value, source: $('#energySource').value, mode: $('#energyMode').value, pricePerKwh: Number($('#energyPrice').value), co2Factor: Number($('#energyCo2').value), start, end } });
     toast('Energiebericht gespeichert');
     await loadReports();
   } catch (error) { toast(error.message, true); }
@@ -832,13 +992,42 @@ function showSendReport(id) {
   modal('Bericht versenden', '<label>Empfängeradresse<input id="reportEmail" type="email" placeholder="technik@example.org"></label>', [{ label: 'Abbrechen', click: closeModal }, { label: 'Senden', primary: true, click: async () => { try { await api(`/api/reports/${id}/send`, { method: 'POST', body: { to: $('#reportEmail').value } }); closeModal(); toast('Bericht wurde versendet'); } catch (error) { toast(error.message, true); } } }]);
 }
 
-async function loadUsers() {
-  const users = await api('/api/users');
-  $('#userList').innerHTML = users.map(user => `<div class="tableRow personRow" data-user-row="${user.id}"><div><strong>${escapeHtml(user.displayName)}</strong><small>${escapeHtml(user.username)}</small></div><div><strong>${escapeHtml(user.jobTitle || (user.role === 'admin' ? 'Administrator' : 'Beobachter'))}</strong><small>${escapeHtml(user.role === 'admin' ? 'Systemadministration' : 'Benutzer')}</small></div><div><span>${escapeHtml(user.department || 'Kein Bereich')}</span><small>${escapeHtml(user.email || user.phone || 'Keine Kontaktdaten')}</small></div><span class="pill ${user.locked ? 'alarm' : user.mustChangePassword ? 'warning' : 'ok'}">${user.locked ? 'Gesperrt' : user.mustChangePassword ? 'Passwortwechsel offen' : 'Aktiv'}</span><div class="personActions"><button class="quiet" data-edit-user="${user.id}">Bearbeiten</button><button class="quiet" data-copy-user="${user.id}">Kopieren</button>${user.id !== 'admin' ? `<button class="quiet" data-delete-user="${user.id}">Löschen</button>` : ''}</div></div>`).join('');
-  $$('[data-user-row]').forEach(row => row.addEventListener('click', event => { if (!event.target.closest('button')) showUserDialog(users.find(user => user.id === row.dataset.userRow)); }));
-  $$('[data-edit-user]').forEach(button => button.addEventListener('click', () => showUserDialog(users.find(user => user.id === button.dataset.editUser))));
-  $$('[data-copy-user]').forEach(button => button.addEventListener('click', () => showUserDialog(users.find(user => user.id === button.dataset.copyUser), { copy: true })));
+function userActivity(timestamp, empty = 'Noch nie') {
+  if (!timestamp) return empty;
+  const delta = Math.max(0, Date.now() - Number(timestamp));
+  const minutes = Math.floor(delta / 60000);
+  if (minutes < 1) return 'Gerade eben';
+  if (minutes < 60) return `vor ${minutes} Min.`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `vor ${hours} Std.`;
+  const days = Math.floor(hours / 24);
+  return `vor ${days} Tag${days === 1 ? '' : 'en'}`;
+}
+
+function renderUsers() {
+  const query = state.userSearch.trim().toLowerCase(), { key, direction } = state.userSort;
+  const rows = state.users.filter(user => !query || [user.displayName, user.username, user.jobTitle, user.role, user.department, user.email, user.phone].some(value => String(value || '').toLowerCase().includes(query)));
+  rows.sort((a, b) => {
+    if (a.role === 'admin' && b.role !== 'admin') return -1;
+    if (b.role === 'admin' && a.role !== 'admin') return 1;
+    const av = key === 'status' ? (a.locked ? 2 : a.mustChangePassword ? 1 : 0) : a[key];
+    const bv = key === 'status' ? (b.locked ? 2 : b.mustChangePassword ? 1 : 0) : b[key];
+    return String(av ?? '').localeCompare(String(bv ?? ''), 'de', { numeric: true }) * direction;
+  });
+  $('#userList').innerHTML = rows.length ? rows.map(user => `<tr data-user-row="${escapeHtml(user.id)}"><td><strong>${escapeHtml(user.displayName)}</strong><small>${escapeHtml(user.username)}</small></td><td><strong>${escapeHtml(user.jobTitle || (user.role === 'admin' ? 'Administrator' : 'Beobachter'))}</strong><small>${user.role === 'admin' ? 'Administrator' : 'Benutzer'}</small></td><td><strong>${escapeHtml(user.department || 'Kein Bereich')}</strong><small>${escapeHtml(user.email || user.phone || 'Keine Kontaktdaten')}</small></td><td><strong>${userActivity(user.lastLoginAt)}</strong><small>${user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('de-DE') : `${Number(user.loginCount) || 0} Anmeldungen`}</small></td><td><strong>${userActivity(user.lastSeenAt)}</strong><small>${user.lastSeenAt ? new Date(user.lastSeenAt).toLocaleString('de-DE') : 'Keine Aktivität'}</small></td><td><span class="pill ${user.locked ? 'alarm' : user.mustChangePassword ? 'warning' : 'ok'}">${user.locked ? 'Gesperrt' : user.mustChangePassword ? 'Passwortwechsel' : 'Aktiv'}</span></td><td><div class="personActions"><button class="quiet" data-edit-user="${escapeHtml(user.id)}">Bearbeiten</button><button class="quiet" data-copy-user="${escapeHtml(user.id)}">Kopieren</button>${user.id !== 'admin' ? `<button class="quiet" data-delete-user="${escapeHtml(user.id)}">Löschen</button>` : ''}</div></td></tr>`).join('') : '<tr><td colspan="7" class="empty">Keine passenden Benutzer gefunden.</td></tr>';
+  $$('[data-user-row]').forEach(row => row.addEventListener('click', event => { if (!event.target.closest('button')) showUserDialog(state.users.find(user => user.id === row.dataset.userRow)); }));
+  $$('[data-edit-user]').forEach(button => button.addEventListener('click', () => showUserDialog(state.users.find(user => user.id === button.dataset.editUser))));
+  $$('[data-copy-user]').forEach(button => button.addEventListener('click', () => showUserDialog(state.users.find(user => user.id === button.dataset.copyUser), { copy: true })));
   $$('[data-delete-user]').forEach(button => button.addEventListener('click', async () => { if (confirm('User wirklich löschen?')) { await api(`/api/users/${button.dataset.deleteUser}`, { method: 'DELETE' }); await loadUsers(); } }));
+  $$('[data-user-sort]').forEach(header => {
+    header.querySelector('.userSortMark')?.remove();
+    if (header.dataset.userSort === key) header.insertAdjacentHTML('beforeend', `<span class="userSortMark">${direction > 0 ? '▲' : '▼'}</span>`);
+  });
+}
+
+async function loadUsers() {
+  state.users = await api('/api/users');
+  renderUsers();
 }
 
 function showUserDialog(user = null, options = {}) {
@@ -848,8 +1037,10 @@ function showUserDialog(user = null, options = {}) {
   if (copying) { person.displayName = `${person.displayName || person.username} (Kopie)`; person.username = `${person.username}.kopie`; }
   const modules = ['dashboard','alarms','visualization','trends','energy','editor'];
   const permissions = person.permissions || Object.fromEntries(modules.map(module => [module, { read: ['dashboard','alarms','visualization','trends','energy'].includes(module), write: false }]));
-  const body = `<div class="personForm"><label>Personenname<input id="displayName" value="${escapeHtml(person.displayName || '')}"></label><label>Benutzername<input id="userName" value="${escapeHtml(person.username || '')}" ${editing ? 'disabled' : ''}></label><label>Funktion / Rolle<input id="jobTitle" value="${escapeHtml(person.jobTitle || (person.role === 'admin' ? 'Administrator' : 'Beobachter'))}"></label><label>Zugriffsebene<select id="userRole"><option value="viewer">Benutzer</option><option value="admin" ${person.role === 'admin' ? 'selected' : ''}>Administrator</option></select></label><label>Bereich / Abteilung<input id="userDepartment" value="${escapeHtml(person.department || '')}"></label><label>E-Mail<input id="userEmail" type="email" value="${escapeHtml(person.email || '')}"></label><label>Telefon<input id="userPhone" type="tel" value="${escapeHtml(person.phone || '')}"></label><label>${editing ? 'Temporäres neues Passwort (leer = unverändert)' : 'Temporäres Passwort (mindestens 10 Zeichen)'}<input id="userPassword" type="password" autocomplete="new-password"></label><label class="wide checkLabel"><input id="forcePasswordChange" type="checkbox" ${!editing || person.mustChangePassword ? 'checked' : ''}> Bei der nächsten Anmeldung ein neues Passwort verlangen</label>${person.locked ? `<div class="accountLocked wide"><strong>Konto nach ${Number(person.failedLoginAttempts) || 7} Fehlversuchen gesperrt</strong><span>${person.lockedAt ? new Date(person.lockedAt).toLocaleString('de-DE') : ''}</span></div>` : ''}<label class="wide">Zusatzinformationen<textarea id="userNotes">${escapeHtml(person.notes || '')}</textarea></label><div class="permissionGrid wide"><strong>Modul</strong><strong>Lesen</strong><strong>Schreiben</strong>${modules.map(module => `<span>${module}</span><input type="checkbox" data-perm="${module}" data-action="read" ${permissions[module]?.read ? 'checked' : ''}><input type="checkbox" data-perm="${module}" data-action="write" ${permissions[module]?.write ? 'checked' : ''}>`).join('')}</div><p class="muted wide">„User & Rechte“ und „Einstellungen“ sind ausschließlich für Administratoren verfügbar.</p></div>`;
-  const save = async (unlock = false) => { try { const updatedPermissions = {}; $$('[data-perm]').forEach(input => { updatedPermissions[input.dataset.perm] ||= {}; updatedPermissions[input.dataset.perm][input.dataset.action] = input.checked; }); await api('/api/users', { method: 'PUT', body: { id: editing ? user.id : undefined, username: $('#userName').value, displayName: $('#displayName').value, password: $('#userPassword').value, forcePasswordChange: $('#forcePasswordChange').checked, unlock, role: $('#userRole').value, jobTitle: $('#jobTitle').value, department: $('#userDepartment').value, email: $('#userEmail').value, phone: $('#userPhone').value, notes: $('#userNotes').value, permissions: updatedPermissions } }); closeModal(); await loadUsers(); toast(unlock ? 'Benutzerkonto entsperrt' : copying ? 'Person kopiert und gespeichert' : 'Person gespeichert'); } catch (error) { toast(error.message, true); } };
+  const allowedNavigation = Array.isArray(person.allowedNavigationIds) ? new Set(person.allowedNavigationIds) : new Set(state.navigationTree.map(node => node.id));
+  const plantPermissions = `<div class="wide"><strong>Sichtbare Anlagenbilder und Ebenen</strong><p class="muted">Nicht ausgewählte Einträge werden für diesen Benutzer vollständig aus dem Anlagenbaum ausgeblendet.</p><div class="plantPermissionList">${state.navigationTree.map(node => `<label style="padding-left:${8 + Math.max(0, (() => { let depth = 0, parent = node.parentId; while (parent && depth < 12) { depth += 1; parent = state.navigationTree.find(item => item.id === parent)?.parentId || ''; } return depth; })()) * 12}px"><input type="checkbox" data-plant-permission value="${escapeHtml(node.id)}" ${allowedNavigation.has(node.id) ? 'checked' : ''}>${treeIconSvg(node.icon)}<span>${escapeHtml(node.label)}</span></label>`).join('')}</div></div>`;
+  const body = `<div class="personForm"><label>Personenname<input id="displayName" value="${escapeHtml(person.displayName || '')}"></label><label>Benutzername<input id="userName" value="${escapeHtml(person.username || '')}" ${editing ? 'disabled' : ''}></label><label>Funktion / Rolle<input id="jobTitle" value="${escapeHtml(person.jobTitle || (person.role === 'admin' ? 'Administrator' : 'Beobachter'))}"></label><label>Zugriffsebene<select id="userRole"><option value="viewer">Benutzer</option><option value="admin" ${person.role === 'admin' ? 'selected' : ''}>Administrator</option></select></label><label>Bereich / Abteilung<input id="userDepartment" value="${escapeHtml(person.department || '')}"></label><label>E-Mail<input id="userEmail" type="email" value="${escapeHtml(person.email || '')}"></label><label>Telefon<input id="userPhone" type="tel" value="${escapeHtml(person.phone || '')}"></label><label>${editing ? 'Temporäres neues Passwort (leer = unverändert)' : 'Temporäres Passwort (mindestens 10 Zeichen)'}<input id="userPassword" type="password" autocomplete="new-password"></label><label class="wide checkLabel"><input id="forcePasswordChange" type="checkbox" ${!editing || person.mustChangePassword ? 'checked' : ''}> Bei der nächsten Anmeldung ein neues Passwort verlangen</label>${person.locked ? `<div class="accountLocked wide"><strong>Konto nach ${Number(person.failedLoginAttempts) || 7} Fehlversuchen gesperrt</strong><span>${person.lockedAt ? new Date(person.lockedAt).toLocaleString('de-DE') : ''}</span></div>` : ''}<label class="wide">Zusatzinformationen<textarea id="userNotes">${escapeHtml(person.notes || '')}</textarea></label>${plantPermissions}<div class="permissionGrid wide"><strong>Modul</strong><strong>Lesen</strong><strong>Schreiben</strong>${modules.map(module => `<span>${module}</span><input type="checkbox" data-perm="${module}" data-action="read" ${permissions[module]?.read ? 'checked' : ''}><input type="checkbox" data-perm="${module}" data-action="write" ${permissions[module]?.write ? 'checked' : ''}>`).join('')}</div><p class="muted wide">„User & Rechte“ und „Einstellungen“ sind ausschließlich für Administratoren verfügbar.</p></div>`;
+  const save = async (unlock = false) => { try { const updatedPermissions = {}; $$('[data-perm]').forEach(input => { updatedPermissions[input.dataset.perm] ||= {}; updatedPermissions[input.dataset.perm][input.dataset.action] = input.checked; }); const allowedNavigationIds = $$('[data-plant-permission]:checked').map(input => input.value); await api('/api/users', { method: 'PUT', body: { id: editing ? user.id : undefined, username: $('#userName').value, displayName: $('#displayName').value, password: $('#userPassword').value, forcePasswordChange: $('#forcePasswordChange').checked, unlock, role: $('#userRole').value, jobTitle: $('#jobTitle').value, department: $('#userDepartment').value, email: $('#userEmail').value, phone: $('#userPhone').value, notes: $('#userNotes').value, permissions: updatedPermissions, allowedNavigationIds } }); closeModal(); await loadUsers(); toast(unlock ? 'Benutzerkonto entsperrt' : copying ? 'Person kopiert und gespeichert' : 'Person gespeichert'); } catch (error) { toast(error.message, true); } };
   const actions = [{ label: 'Abbrechen', click: closeModal }];
   if (editing) actions.push({ label: 'Person kopieren', click: () => showUserDialog(user, { copy: true }) });
   if (editing && person.locked) actions.push({ label: 'Konto entsperren', click: () => save(true) });
@@ -945,10 +1136,19 @@ $('#dashboardEdit').addEventListener('click', event => { state.dashboardEdit=!st
 $('#dashboardAdd').addEventListener('click', () => showDashboardDialog());
 $('#dashboardRefresh').addEventListener('click', refreshDashboard);
 $('#createReport').addEventListener('click', createReport);
+$('#addEnergyStates').addEventListener('click', () => showEnergyStatePicker().catch(error => toast(error.message, true)));
+$('#loadEnergyHistory').addEventListener('click', loadEnergyHistory);
+$('#pickEnergyState').addEventListener('click', () => showObjectPicker({ title: 'ioBroker-Objektbaum · Verbrauchsdatenpunkt', numericOnly: true, selected: $('#energyState').value ? [{ id: $('#energyState').value }] : [], onApply: rows => { $('#energyState').value = rows[0].id; } }).catch(error => toast(error.message, true)));
 $('#newUser').addEventListener('click', () => showUserDialog());
 $('#settingsFont').addEventListener('change', event => applyFont(event.target.value));
-$('#saveUiSettings').addEventListener('click', async () => { try { const rawAdminUrl = $('#settingsIoBrokerUrl').value.trim(), ioBrokerAdminUrl = rawAdminUrl ? safeVisUrl(rawAdminUrl) : ''; if (rawAdminUrl && !ioBrokerAdminUrl) throw new Error('Bitte eine gültige ioBroker-Adresse eingeben'); const settings = await api('/api/settings', { method: 'PUT', body: { siteName: $('#settingsSiteName').value, fontFamily: $('#settingsFont').value, autoLogoffMinutes: Number($('#settingsAutoLogoff').value), ioBrokerAdminUrl } }); state.bootstrap.settings = settings; $('#settingsIoBrokerUrl').value = settings.ioBrokerAdminUrl || ''; $('#headerSiteName').textContent = settings.siteName; applyFont(settings.fontFamily); resetAutoLogout(); toast('Oberflächeneinstellungen gespeichert'); } catch (error) { toast(error.message,true); } });
+$('#settingsTheme').addEventListener('change', event => applyTheme(event.target.value));
+$('#saveUiSettings').addEventListener('click', async () => { try { const rawAdminUrl = $('#settingsIoBrokerUrl').value.trim(), ioBrokerAdminUrl = rawAdminUrl ? safeVisUrl(rawAdminUrl) : ''; if (rawAdminUrl && !ioBrokerAdminUrl) throw new Error('Bitte eine gültige ioBroker-Adresse eingeben'); const settings = await api('/api/settings', { method: 'PUT', body: { siteName: $('#settingsSiteName').value, fontFamily: $('#settingsFont').value, theme: $('#settingsTheme').value, autoLogoffMinutes: Number($('#settingsAutoLogoff').value), ioBrokerAdminUrl } }); state.bootstrap.settings = settings; $('#settingsIoBrokerUrl').value = settings.ioBrokerAdminUrl || ''; $('#headerSiteName').textContent = settings.siteName; applyFont(settings.fontFamily); applyTheme(settings.theme); resetAutoLogout(); toast('Oberflächeneinstellungen gespeichert'); } catch (error) { toast(error.message,true); } });
 $('#managePlantTree').addEventListener('click', () => showTreeNodeDialog());
+$('#togglePlantTree').addEventListener('click', event => { const layout = $('.visualizationLayout'), collapsed = !layout.classList.contains('tree-collapsed'); layout.classList.toggle('tree-collapsed', collapsed); event.currentTarget.setAttribute('aria-expanded', String(!collapsed)); event.currentTarget.textContent = collapsed ? 'Anlagenbaum ausklappen' : 'Anlagenbaum einklappen'; });
+$('#toggleTrendSettings').addEventListener('click', event => toggleSettingsPanel(event.currentTarget, $('#trendSettings'), $('#view-trends'), 'settings-collapsed'));
+$('#toggleEnergySettings').addEventListener('click', event => toggleSettingsPanel(event.currentTarget, $('#energySettings'), $('#view-energy'), 'energy-settings-collapsed'));
+$('#userSearch').addEventListener('input', event => { state.userSearch = event.target.value; renderUsers(); });
+$$('[data-user-sort]').forEach(header => header.addEventListener('click', () => { const key = header.dataset.userSort; state.userSort = { key, direction: state.userSort.key === key ? -state.userSort.direction : 1 }; renderUsers(); }));
 $('#modal').addEventListener('click', event => { if (event.target === $('#modal')) closeModal(); });
 ['pointerdown','keydown','touchstart'].forEach(eventName => document.addEventListener(eventName, resetAutoLogout, { passive: true }));
 setDefaultDates();

@@ -1,6 +1,6 @@
 {
   "name": "iobroker.iot-glt",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Responsive building management and energy management adapter for ioBroker",
   "keywords": ["iobroker", "building", "glt", "energy", "visualization", "raspberry-pi"],
   "homepage": "https://github.com/Petzi2712/ioBroker.iot-glt",

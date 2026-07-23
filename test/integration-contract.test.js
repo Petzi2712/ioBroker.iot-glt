@@ -35,3 +35,22 @@ test('every authenticated user can complete the mandatory first password change'
   assert.match(main, /requireAuthenticated\(allowMustChange = false\)/);
   assert.match(main, /app\.post\('\/api\/change-password', this\.requireAuthenticated\(true\)/);
 });
+
+test('navigation and plant views are filtered by user permissions', () => {
+  assert.match(main, /navigationForUser\(user\)/);
+  assert.match(main, /allowedNavigationIds/);
+  assert.match(app, /plantPermissions/);
+});
+
+test('all data point workflows use the ioBroker object picker', () => {
+  assert.match(app, /showObjectPicker/);
+  assert.match(app, /api\/trend-states/);
+  assert.match(app, /showEnergyStatePicker/);
+});
+
+test('themes, energy history and trend interaction are wired', () => {
+  assert.match(app, /applyTheme/);
+  assert.match(app, /loadEnergyHistory/);
+  assert.match(app, /bindTrendNavigation/);
+  assert.match(app, /multiTrendSvg/);
+});

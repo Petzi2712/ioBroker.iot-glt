@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="topbar">
-    <button id="menuToggle" class="brand" aria-expanded="false" aria-controls="sidebar" aria-label="Sidebar ein- oder ausblenden"><svg class="brandMark" viewBox="0 0 64 64" aria-hidden="true"><rect x="1" y="1" width="62" height="62" rx="13" fill="#757575"/><g fill="none" stroke="#f4f4f4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 53V25L34 12l16 12v29M8 53V34l9-5M50 37l7-5v21"/><path d="M24 27h12M24 36h12M24 45h9"/></g><path d="M9 52 30 46 53 27" fill="none" stroke="#fe6e00" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><g fill="#fe6e00" stroke="#f4f4f4" stroke-width="2"><circle cx="9" cy="52" r="5"/><circle cx="30" cy="46" r="5"/><circle cx="53" cy="27" r="5"/></g></svg><span class="srOnly">IOT GLT Menü</span></button>
+    <button id="menuToggle" class="brand" aria-expanded="false" aria-controls="sidebar" aria-label="Sidebar ein- oder ausblenden"><img class="brandMark" src="/assets/glt-logo.svg" alt=""><span class="srOnly">IOT GLT Menü</span></button>
     <span id="headerSiteName" class="headerSiteName">Gebäude Zentrale</span>
     <div class="topStatus"><span id="connectionDot" class="statusDot ok"></span><span id="clock"></span><button id="notificationButton" class="bellButton" aria-label="Störmeldungen" aria-expanded="false">♟<span id="notificationBadge">0</span></button><button id="loginButton" class="headerUserButton" aria-label="Benutzerkonto öffnen"><span id="headerUserName">Anmelden</span><span id="headerUserAvatar">?</span></button></div>
     <aside id="notificationTray" class="notificationTray"><div class="panelHead"><h2>Aktuelle Meldungen</h2><button id="closeNotifications" class="quiet">×</button></div><div id="notificationList" class="tableList empty">Keine aktiven Meldungen.</div></aside>
@@ -18,17 +18,17 @@
 
   <aside id="sidebar" class="sidebar" aria-hidden="true">
     <nav id="navigation">
-      <button data-view="dashboard"><span>▦</span>Technisches Dashboard</button>
-      <button data-view="alarms"><span>!</span>Betriebs- &amp; Störmeldungen</button>
-      <button data-view="visualization"><span>⌂</span>Visualisierung</button>
-      <button data-view="trends"><span>⌁</span>Trendkurven</button>
-      <button data-view="energy"><span>◫</span>Energiemanagement</button>
-      <button data-view="editor"><span>◇</span>Visualisierung einrichten</button>
-      <button data-view="iobroker"><span>IO</span>ioBroker Administration</button>
-      <button data-view="users"><span>♙</span>User &amp; Rechte</button>
-      <button data-view="settings"><span>⚙</span>Einstellungen</button>
+      <button data-view="dashboard" aria-label="Technisches Dashboard"><svg class="navIcon" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg><span class="navLabel">Technisches Dashboard</span></button>
+      <button data-view="alarms" aria-label="Betriebs- und Störmeldungen"><svg class="navIcon" viewBox="0 0 24 24"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v5m0 3v.1"/></svg><span class="navLabel">Betriebs- &amp; Störmeldungen</span></button>
+      <button data-view="visualization" aria-label="Visualisierung"><svg class="navIcon" viewBox="0 0 24 24"><path d="m4 11 8-7 8 7v9h-6v-6h-4v6H4z"/></svg><span class="navLabel">Visualisierung</span></button>
+      <button data-view="editor" aria-label="Visualisierung einrichten"><svg class="navIcon" viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4L4 16Z"/><path d="m13 7 4 4"/></svg><span class="navLabel">Visualisierung einrichten</span></button>
+      <button data-view="trends" aria-label="Trendkurven"><svg class="navIcon" viewBox="0 0 24 24"><path d="M4 20V5m0 15h16"/><path d="m7 16 4-5 3 2 5-7"/></svg><span class="navLabel">Trendkurven</span></button>
+      <button data-view="energy" aria-label="Energiemanagement"><svg class="navIcon" viewBox="0 0 24 24"><path d="m13 2-8 12h7l-1 8 8-12h-7l1-8Z"/></svg><span class="navLabel">Energiemanagement</span></button>
+      <button data-view="iobroker" aria-label="ioBroker Administration"><svg class="navIcon" viewBox="0 0 24 24"><path d="M5 5h14v14H5z"/><path d="M8 9h8m-8 3h5m-5 3h7"/></svg><span class="navLabel">ioBroker Administration</span></button>
+      <button data-view="users" aria-label="User und Rechte"><svg class="navIcon" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6.5 16c.7-2 4.3-2 5 0M14 10h3m-3 4h3"/></svg><span class="navLabel">User &amp; Rechte</span></button>
+      <button data-view="settings" aria-label="Einstellungen"><svg class="navIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/></svg><span class="navLabel">Einstellungen</span></button>
     </nav>
-    <footer><strong id="sideUser">Gast</strong><small id="sideRole">Nur lesen</small></footer>
+    <footer><div class="sidebarIdentity"><strong id="sideUser">Gast</strong><small id="sideRole">Nur lesen</small></div><small id="sideVersion" class="sideVersion">0.0.0</small></footer>
   </aside>
 
   <main id="workspace" class="workspace">
@@ -40,21 +40,22 @@
     </section>
 
     <section id="view-visualization" class="view">
-      <div class="viewHead"><div><p class="eyebrow">LIVE-ANLAGENBILDER</p><h1>Visualisierung</h1></div><a id="openVisExternal" class="quiet buttonLink" href="#" target="_blank" rel="noopener" hidden>Ansicht extern öffnen</a></div>
+      <div class="viewHead"><div><p class="eyebrow">LIVE-ANLAGENBILDER</p><h1>Visualisierung</h1></div><div class="actions"><button id="togglePlantTree" class="quiet" aria-expanded="true">Anlagenbaum einklappen</button><a id="openVisExternal" class="quiet buttonLink" href="#" target="_blank" rel="noopener" hidden>Ansicht extern öffnen</a></div></div>
       <div class="visualizationLayout">
-        <aside class="plantTreePanel panel"><div class="panelHead"><h2>Anlagenbaum</h2><small>Ebene für Ebene</small></div><div id="plantTree" class="plantTree"></div></aside>
-        <section class="visFramePanel panel"><div class="visFrameHead"><div><small id="visFramePath">Noch keine Ansicht gewählt</small><h2 id="visFrameTitle">Anlagenansicht</h2></div></div><iframe id="visFrame" class="visFrame" title="ioBroker VIS Anlagenansicht" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-pointer-lock allow-presentation" referrerpolicy="strict-origin-when-cross-origin" hidden></iframe><div id="internalVisual" class="visualShell"><div id="liveCanvas" class="plantCanvas"></div></div><div id="visFrameEmpty" class="visFrameEmpty" hidden><strong>Für diesen Eintrag ist noch keine VIS-Ansicht hinterlegt.</strong><span>Den Link können Administratoren unter „Visualisierung einrichten“ ergänzen.</span></div></section>
+        <aside class="plantTreePanel panel"><div class="panelHead"><h2>Anlagenbaum</h2></div><div id="plantTree" class="plantTree"></div></aside>
+        <section class="visFramePanel panel"><div class="visFrameHead"><h2 id="visFrameTitle">Anlagenansicht</h2></div><iframe id="visFrame" class="visFrame" title="ioBroker VIS Anlagenansicht" sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals allow-pointer-lock allow-presentation" referrerpolicy="strict-origin-when-cross-origin" hidden></iframe><div id="internalVisual" class="visualShell"><div id="liveCanvas" class="plantCanvas"></div></div><div id="visFrameEmpty" class="visFrameEmpty" hidden></div></section>
       </div>
     </section>
 
     <section id="view-trends" class="view">
       <div class="viewHead"><div><p class="eyebrow">ZEITREIHEN</p><h1>Trendkurven</h1></div><div class="actions"><button id="exportTrendPdf" class="quiet">PDF direkt herunterladen</button><button id="addTrendStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadTrend" class="primary">Aktualisieren</button></div></div>
-      <div class="filterBar trendFilters">
+      <button id="toggleTrendSettings" class="sectionToggle quiet" aria-expanded="true">Einstellungen einklappen</button>
+      <div id="trendSettings" class="filterBar trendFilters collapsibleSettings">
         <label>Datenbank<select id="trendSource"></select></label><label>Zeitskalierung<select id="trendPeriod"><option value="1">1 Stunde</option><option value="6">6 Stunden</option><option value="24" selected>24 Stunden</option><option value="168">7 Tage</option><option value="custom">Benutzerdefiniert</option></select></label>
         <label>Von<input id="trendStart" type="datetime-local"></label><label>Bis<input id="trendEnd" type="datetime-local"></label>
-        <label>Darstellung<select id="trendType"><option value="line">Linien</option><option value="step">Stufen</option><option value="bar">Balken</option><option value="heat">Heatmap</option></select></label><label>Datengenauigkeit<select id="trendResolution"><option value="0">Rohdaten · höchste Auflösung</option><option value="1">1 Sekunde</option><option value="10">10 Sekunden · leicht geglättet</option><option value="60">1 Minute · Mittelwert</option><option value="300">5 Minuten · geglättet</option><option value="900">15 Minuten · stark geglättet</option><option value="3600">1 Stunde · Langzeittrend</option></select></label><label>Wert min<input id="trendMin" type="number" placeholder="Automatisch"></label><label>Wert max<input id="trendMax" type="number" placeholder="Automatisch"></label><label>Aktualisierung<select id="trendLive"><option value="live">Live · 15 Sekunden</option><option value="manual">Manuell</option></select></label>
+        <label>Darstellung<select id="trendType"><option value="line">Linien</option><option value="step">Stufen</option><option value="bar">Balken</option><option value="pie">Tortendiagramm</option><option value="heat">Heatmap</option></select></label><label>Datengenauigkeit<select id="trendResolution"><option value="0">Rohdaten · höchste Auflösung</option><option value="1">1 Sekunde</option><option value="10">10 Sekunden · leicht geglättet</option><option value="60">1 Minute · Mittelwert</option><option value="300">5 Minuten · geglättet</option><option value="900">15 Minuten · stark geglättet</option><option value="3600">1 Stunde · Langzeittrend</option></select></label><label>Wert min<input id="trendMin" type="number" placeholder="Automatisch"></label><label>Wert max<input id="trendMax" type="number" placeholder="Automatisch"></label><label>Aktualisierung<select id="trendLive"><option value="live">Live · 15 Sekunden</option><option value="manual">Manuell</option></select></label>
       </div>
-      <div class="panel chartPanel"><div id="trendMeta" class="panelHead"><h2>Noch keine Datenpunkte ausgewählt</h2></div><div id="trendChart" class="chart"><div class="empty">Über „Datenpunkte hinzufügen“ mehrere Zeitreihen auswählen.</div></div><div id="trendLegend" class="trendLegend"></div></div>
+      <div class="panel chartPanel"><div id="trendChart" class="chart"><div class="empty">Über „Datenpunkte hinzufügen“ mehrere Zeitreihen auswählen.</div></div><div id="trendLegend" class="trendLegend"></div></div>
     </section>
 
     <section id="view-iobroker" class="view">
@@ -63,15 +64,18 @@
     </section>
 
     <section id="view-energy" class="view">
-      <div class="viewHead"><div><p class="eyebrow">VERBRAUCH · KOSTEN · CO₂</p><h1>Energiemanagement</h1></div><button id="createReport" class="primary">Bericht berechnen</button></div>
-      <div class="filterBar energyFilters">
+      <div class="viewHead"><div><p class="eyebrow">VERBRAUCH · KOSTEN · CO₂</p><h1>Energiemanagement</h1></div><div class="actions"><button id="addEnergyStates" class="quiet">Datenpunkte hinzufügen</button><button id="loadEnergyHistory" class="quiet">Historische Daten laden</button><button id="createReport" class="primary">Bericht berechnen</button></div></div>
+      <button id="toggleEnergySettings" class="sectionToggle quiet" aria-expanded="true">Einstellungen einklappen</button>
+      <div id="energySettings" class="filterBar energyFilters collapsibleSettings">
+        <label>Datenbank<select id="energySource"></select></label>
         <label>Berichtsname<input id="reportName" value="Energieauswertung"></label>
-        <label>Verbrauchsdatenpunkt<input id="energyState" list="stateOptions" placeholder="kWh-Zähler"></label>
+        <label>Verbrauchsdatenpunkt<div class="objectInput"><input id="energyState" readonly placeholder="kWh-Zähler"><button id="pickEnergyState" type="button" class="quiet">Objekte</button></div></label>
         <label>Berechnung<select id="energyMode"><option value="counter">Zählerdifferenz</option><option value="sum">Summe</option><option value="average">Mittelwert</option></select></label>
         <label>Preis / kWh<input id="energyPrice" type="number" step="0.001" value="0.35"></label>
         <label>kg CO₂ / kWh<input id="energyCo2" type="number" step="0.001" value="0.38"></label>
         <label>Von<input id="energyStart" type="date"></label><label>Bis<input id="energyEnd" type="date"></label>
       </div>
+      <div class="panel energyHistoryPanel"><div id="energyHistoryChart" class="chart"><div class="empty">Datenpunkte hinzufügen und historische Daten laden.</div></div><div id="energyLegend" class="trendLegend"></div></div>
       <div id="reportCards" class="reportGrid"><div class="empty panel">Noch keine Berichte gespeichert.</div></div>
     </section>
 
@@ -82,12 +86,12 @@
 
     <section id="view-users" class="view">
       <div class="viewHead"><div><p class="eyebrow">ZUGRIFFSKONTROLLE</p><h1>User &amp; Rechte</h1></div><button id="newUser" class="primary">User anlegen</button></div>
-      <div class="panel"><div id="userList" class="tableList"></div></div>
+      <div class="panel userDirectory"><div class="userToolbar"><label class="searchField">Volltextsuche<input id="userSearch" type="search" placeholder="Name, Benutzer, Rolle, Bereich …"></label></div><div class="userTableViewport"><table class="userTable"><thead><tr><th data-user-sort="displayName">Person</th><th data-user-sort="role">Rolle</th><th data-user-sort="department">Bereich</th><th data-user-sort="lastLoginAt">Letzte Anmeldung</th><th data-user-sort="lastSeenAt">Zuletzt aktiv</th><th data-user-sort="status">Status</th><th>Aktionen</th></tr></thead><tbody id="userList"></tbody></table></div></div>
     </section>
 
     <section id="view-settings" class="view">
       <div class="viewHead"><div><p class="eyebrow">SYSTEM</p><h1>Einstellungen</h1></div><button id="saveUiSettings" class="primary">Einstellungen speichern</button></div>
-      <div class="panel settingsGrid"><label>Name der GLT<input id="settingsSiteName" maxlength="120" placeholder="Gebäude Zentrale"></label><label>Schriftart<select id="settingsFont"><option value="apple">Apple System</option><option value="material">Material / Roboto</option></select></label><label>Automatischer Logoff nach Minuten<input id="settingsAutoLogoff" type="number" min="5" max="1440" step="5" value="30"><small>Die Zeit wird bei Benutzeraktivität neu gestartet.</small></label><label>ioBroker-Admin-Adresse<input id="settingsIoBrokerUrl" maxlength="2048" placeholder="192.168.178.101:8081"><small>Leer = aktueller Host mit Port 8081.</small></label></div>
+      <div class="panel settingsGrid"><label>Name der GLT<input id="settingsSiteName" maxlength="120" placeholder="Gebäude Zentrale"></label><label>Schriftart<select id="settingsFont"><option value="apple">Apple System</option><option value="material">Material / Roboto</option></select></label><label>Farbschema<select id="settingsTheme"><option value="light">Evreghen Hell</option><option value="dark">Darkmodus</option><option value="system">Systemeinstellung</option></select><small>Die aktuelle gut lesbare Schrift bleibt erhalten.</small></label><label>Automatischer Logoff nach Minuten<input id="settingsAutoLogoff" type="number" min="5" max="1440" step="5" value="30"><small>Die Zeit wird bei Benutzeraktivität neu gestartet.</small></label><label>ioBroker-Admin-Adresse<input id="settingsIoBrokerUrl" maxlength="2048" placeholder="192.168.178.101:8081"><small>Leer = aktueller Host mit Port 8081.</small></label></div>
     </section>
   </main>
 
